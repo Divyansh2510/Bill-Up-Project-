@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Section</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet"
+        type="text/css" /> <!-- for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/account.css') }}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+
+</head>
+
+<body>
+    <!-- This the bill entry form -->
+    <div class="modal fade" id="addNewModal" tabindex="-1" aria-labelledby="addNewModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addNewModalLabel">Add New Entry</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <form id="addNewForm" method="POST" action="/add_entry/{{ customer_name }}">
+
+                        <div class="mb-3">
+                            <label for="purchaseDate" class="form-label">Purchase Date</label>
+                            <input type="date" class="form-control" id="purchaseDate" name="pdate" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3"
+                                placeholder="Enter notes here..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="items_details" class="form-label">Items</label>
+                            <textarea class="form-control" id="items_details" name="items_details" rows="3"
+                                placeholder="Enter items here..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="items_details" class="form-label">Total</label>
+                            <input class="form-control" id="Total" name="Total" placeholder="Enter Total here..."
+                                required>
+                        </div>
+                        <!-- <div class="mb-3">
+                            <label class="form-label">Items</label>
+                            <div id="itemsContainer">
+                                
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm mt-2" id="addItemButton">
+                                <i class="fa fa-plus"></i> Add Item
+                            </button>
+                            <input type="hidden" id="items" name="items" value="[]" />
+                        </div> -->
+
+
+                        <div class="mb-3">
+                            <label for="dueDate" class="form-label">Due Date</label>
+                            <input type="date" class="form-control" id="dueDate" name="duedate" required>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveButton">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Get the dueDate input field
+            const dueDateInput = document.getElementById("dueDate");
+
+            // Get today's date and add 1 day to ensure only future dates are allowed
+            let today = new Date();
+            today.setDate(today.getDate() + 1); // Set tomorrow as the minimum date
+
+            // Format the date as YYYY-MM-DD (required for input[type=date])
+            let minDate = today.toISOString().split("T")[0];
+
+            // Set the minimum selectable date
+            dueDateInput.setAttribute("min", minDate);
+        });
+
+    </script>
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">Edit Entry</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm" method="POST" action="">
+                        <input type="hidden" name="entry_id" id="editEntryId">
+                        <input type="hidden" id="customerNameField">
+                        <div class="mb-3">
+                            <label for="editPurchaseDate" class="form-label">Purchase Date</label>
+                            <input type="date" class="form-control" id="editPurchaseDate" name="pdate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editNotes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="editNotes" name="notes" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editItemsDetails" class="form-label">Items</label>
+                            <textarea class="form-control" id="editItemsDetails" name="items_details" rows="3"
+                                required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editTotal" class="form-label">Total</label>
+                            <input type="number" class="form-control" id="editTotal" name="Total" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDueDate" class="form-label">Due Date</label>
+                            <input type="date" class="form-control" id="editDueDate" name="duedate" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="editSaveButton">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const editButtons = document.querySelectorAll(".edit-button");
+            const editModal = new bootstrap.Modal(document.getElementById("editModal"));
+            const editForm = document.getElementById("editForm");
+
+            editButtons.forEach(button => {
+                button.addEventListener("click", async () => {
+                    const entryId = button.getAttribute("data-id");
+                    const customerName = button.getAttribute("data-customer-name"); // Use a data attribute for customerName
+
+                    try {
+                        // Fetch entry details
+                        const response = await fetch(`/get_entry/${customerName}/${entryId}`);
+                        if (!response.ok) {
+                            throw new Error("Failed to fetch entry details");
+                        }
+                        const entry = await response.json();
+
+                        // Populate modal fields
+                        document.getElementById("editEntryId").value = entry.id || "";
+                        document.getElementById("editPurchaseDate").value = entry.purchase_date || "";
+                        document.getElementById("editNotes").value = entry.notes || "";
+                        document.getElementById("editItemsDetails").value = entry.items_details || "";
+                        document.getElementById("editTotal").value = entry.total || "";
+                        document.getElementById("editDueDate").value = entry.due_date || "";
+
+                        // Store customer name for the save handler
+                        document.getElementById("customerNameField").value = customerName;
+
+                        // Show the modal
+                        editModal.show();
+                    } catch (error) {
+                        console.error("Error opening modal:", error);
+                        alert("Failed to open the edit modal. Please try again.");
+                    }
+                });
+            });
+
+            document.getElementById("editSaveButton").addEventListener("click", async () => {
+                const formData = new FormData(editForm);
+
+                try {
+                    // Define customerName from a hidden field or context
+                    const customerName = document.getElementById("customerNameField").value;
+
+                    // Submit the updated data
+                    const response = await fetch(`/update_entry/${customerName}`, {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    if (response.ok) {
+                        alert("Entry updated successfully!");
+                        location.reload();
+                    } else {
+                        alert("Error while updating.");
+                    }
+                } catch (error) {
+                    console.error("Error saving entry:", error);
+                    alert("An error occurred while updating the entry.");
+                }
+            });
+        });
+
+
+    </script>
+
+    <div class="modal fade" id="c_editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">Edit Customer Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editCustomerForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editContact" class="form-label">Contact</label>
+                            <input type="text" class="form-control" type="tel" minlength="10" maxlength="10"
+                                pattern="^\d{10}$" id="editContact" name="contact" value="{{ customer_contact }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editEmail" name="email"
+                                value="{{ customer_email }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById("editCustomerForm").addEventListener("submit", function (e) {
+            e.preventDefault(); // Prevent form default submission
+
+            const customerName = "{{ customer_name }}"; // Pass customer name from the template
+            const contact = document.getElementById("editContact").value;
+            const email = document.getElementById("editEmail").value;
+
+            fetch(`/update_customer/${customerName}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ contact, email }),
+            })
+                .then((response) => {
+                    if (response.ok) {
+                        location.reload(); // Reload page after successful update
+                    } else {
+                        alert("Failed to update customer details.");
+                    }
+                })
+                .catch((error) => console.error("Error:", error));
+        });
+    </script>
+
+
+
+
+    <script>
+        document.getElementById('saveButton').addEventListener('click', function () {
+            document.getElementById('addNewForm').submit();
+        });
+        async function deleteEntry(customerName, entryId, rowElement) {
+            const confirmed = confirm("Are you sure you want to delete this entry?");
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`/delete_entry/${customerName}/${entryId}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                });
+
+                if (response.ok) {
+                    alert("Entry deleted successfully!");
+                    rowElement.remove(); // Remove the row from the table
+                } else {
+                    alert("Failed to delete the entry. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting entry:", error);
+                alert("An error occurred. Please try again.");
+            }
+        }
+
+
+    </script>
+
+
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
+        <div class="container-fluid px-4">
+            <!-- Title with larger font size -->
+            <a class="navbar-brand fw-bold" href="#page-top" style="font-size: 1.8rem;">
+                <i class='fas fa-clone mx-2' style='font-size:30px;color:blue'></i>Bill Up</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+                Menu
+                <i class="bi-list"></i>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarResponsive">
+                <!-- Items aligned to the right corner -->
+                <div class="d-flex align-items-center">
+                    <span class="navbar-text me-3 fw-bold" style="font-size: 1.2rem;">
+                        Welcome , {{ b_name }} !
+                    </span>
+                    <a href="#" class="btn btn-primary px-3 mb-2 mb-lg-0 me-3">
+                        <span class="d-flex align-items-center">
+                            <i class="fa-solid fa-shop me-2"></i> <!-- Add a Bootstrap margin class -->
+                            <span class="small">Shop</span>
+                        </span>
+                    </a>
+                    <a href="#" class="btn btn-primary px-3 mb-2 mb-lg-0 me-3">
+                        <span class="d-flex align-items-center">
+                            <i class="fa fa-language me-2"></i> <!-- Add a Bootstrap margin class -->
+                            <span class="small">Language</span>
+                        </span>
+                    </a>
+                    <!-- Profile Icon -->
+                    <a href="#" class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0 me-3">
+                        <span class="d-flex align-items-center">
+                            <i class="bi-person-circle me-2"></i>
+                            <span class="small">{{ user_id }}</span>
+                        </span>
+                    </a>
+                    <!-- Logout Button -->
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger px-3 py-2 mb-2 mb-lg-0">
+                        <span class="d-flex align-items-center">
+                            <i class="fa fa-sign-out-alt me-2"></i>
+                            <span class="small">Logout</span>
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="customer-section">
+        <a href="{{ url_for('customer') }}" class="btn btn-primary me-3">
+            <i class="fa fa-caret-left"></i> Back
+        </a>
+        <div>
+            <button class="btn btn-info btn-sm me-3" data-bs-toggle="modal" data-bs-target="#c_editModal">
+                <i class="fa fa-edit"></i> Edit
+            </button>
+        </div>
+
+        <div class="title1">{{ customer_name }}</div>
+        <div class="title2">Contact:{{ customer_contact }}</div>
+        <div class="title">Email:{{ customer_email }}</div>
+        <!-- <button class="btn btn-info btn-sm" ><i class="fa fa-edit"></i></button> -->
+
+
+        <div class="actions">
+            Total : ₹{{ overall_total }}
+            <!-- Add New Button -->
+            <a href="#" class="add-new" data-bs-toggle="modal" data-bs-target="#addNewModal">
+                <i class="fa fa-plus"></i> Add New
+            </a>
+            <!-- Dropdown -->
+            <div class="dropdown">
+                <button>Sort By <i class="fa fa-caret-down"></i></button>
+                <ul class="dropdown-menu">
+                    <li>A-Z</li>
+                    <li>Amount</li>
+                    <li>Date</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {% if entries %}
+    <table class="employee-table">
+        <thead class="table-light">
+            <tr>
+                <th>Purchase Date</th>
+                <th>Payment</th>
+                <th>Notes</th>
+                <th>Items</th>
+                <th>Tot. Amount</th>
+                <th>Due Date</th>
+                <th>Notification</th>
+                <th>Edit</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr id="row-{{ entry.id }}">
+                <td>{{ entry.purchase_date }}</td>
+                <td>
+                    {% if entry.Total == 0 %}
+                    <span class="badge bg-success">Done</span>
+                    {% else %}
+                    <span class="badge bg-danger">Pending</span>
+                    {% endif %}
+                </td>
+                <td>{{ entry.notes }}</td>
+                <!-- <td>
+                        {% if entry["items_details"] %}
+                            <ul>
+                                {% for item in entry["items_details"] %}
+                                    <li>{{ item.name }}: ₹{{ item.price }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No items added.
+                        {% endif %}
+                    </td> -->
+
+                <td>{{ entry.items_details }}</td>
+                <!-- <td><button class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></button></td> -->
+                <!-- <td><button class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></button></td> -->
+                <td>{{ entry.Total }}</td>
+                <!-- <td> total </td> -->
+
+                <td>{{ entry.due_date }}</td>
+                <!-- <td><button class="btn btn-warning btn-sm"><i class="fa fa-bell"></i></button></td> -->
+
+                <td>
+                    <div class="notification-container">
+
+                        <button class="btn btn-warning btn-sm notification-btn" onclick="toggleDropdown(this)">
+                            <i class="fa fa-bell"></i>
+                        </button>
+
+
+                        <div class="dropdown-menu main-dropdown" style="display: none;">
+                            <div class="dropdown-item" onclick="handleMainOption(this, 'Customer')">Customer</div>
+                            <div class="dropdown-item" onclick="handleMainOption(this, 'You')">You</div>
+                        </div>
+
+
+                        <div class="dropdown-menu sub-dropdown" style="display: none;">
+                            <div class="dropdown-item" onclick="handleSubOption(this, 'Instant')">Instant</div>
+                            <div class="dropdown-item" onclick="handleSubOption(this, 'Due Date')">Due Date</div>
+                        </div>
+
+
+                        <small class="selected-option"></small>
+                    </div>
+                </td>
+                <!-- In your table row (Dropdown button) -->
+
+                <td><button class="btn btn-info btn-sm edit-button" data-bs-toggle="modal" data-bs-target="#editModal"
+                        data-id="{{ entry['id'] }}" data-customer-name="{{ customer_name }}">
+                        <i class="fa fa-edit"></i>
+                    </button>
+                </td>
+
+                <td>
+                    <button class="btn btn-danger btn-sm"
+                        onclick="deleteEntry('{{ customer_name }}', {{ entry.id }}, this.closest('tr'))">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="no-entries"><span style="font-size: 8rem;">&#x263A;</span><br> No entry found. Please enter the records.
+    </p>
+    {% endif %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/umd/popper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.min.js"></script>
+    <script>
+        document.addEventListener("click", function (event) {
+            // Close all dropdowns if click is outside
+            document.querySelectorAll(".notification-container").forEach((container) => {
+                const mainDropdown = container.querySelector(".main-dropdown");
+                const subDropdown = container.querySelector(".sub-dropdown");
+                const button = container.querySelector(".notification-btn");
+
+                // Check if the clicked element is inside this container
+                if (!container.contains(event.target)) {
+                    mainDropdown.style.display = "none";
+                    subDropdown.style.display = "none";
+                }
+            });
+        });
+        function toggleDropdown(button) {
+            const container = button.closest('.notification-container');
+            const mainDropdown = container.querySelector('.main-dropdown');
+            const subDropdown = container.querySelector('.sub-dropdown');
+            const selectedOption = container.querySelector('.selected-option');
+
+            if (button.classList.contains('green')) {
+                // Reset everything if button is green
+                button.classList.remove('green');
+                selectedOption.textContent = '';
+                mainDropdown.style.display = 'none';
+                subDropdown.style.display = 'none';
+            } else {
+                // Show main dropdown
+                mainDropdown.style.display = 'block';
+                subDropdown.style.display = 'none';
+            }
+        }
+
+        function handleMainOption(item, option) {
+            const container = item.closest('.notification-container');
+            const mainDropdown = container.querySelector('.main-dropdown');
+            const subDropdown = container.querySelector('.sub-dropdown');
+            const selectedOption = container.querySelector('.selected-option');
+            const button = container.querySelector('.notification-btn');
+
+            if (option === 'Customer') {
+                // Show sub-dropdown if "Customer" is selected
+                mainDropdown.style.display = 'none';
+                subDropdown.style.display = 'block';
+            } else {
+                // Set "You" as selected and turn button green
+                selectedOption.textContent = `(${option})`;
+                mainDropdown.style.display = 'none';
+                subDropdown.style.display = 'none';
+                button.classList.add('green');
+            }
+        }
+
+
+
+        function handleSubOption(item, subOption) {
+            const container = item.closest('.notification-container');
+            const subDropdown = container.querySelector('.sub-dropdown');
+            const selectedOption = container.querySelector('.selected-option');
+            const button = container.querySelector('.notification-btn');
+
+            const customerEmail = "{{ customer_email }}";
+            const customerName = "{{ customer_name }}";
+            const b_name = "{{ b_name }}";
+            const overall_total = "{{ overall_total }}"
+            const row = item.closest("tr");
+            const purchaseDate = row.querySelector("td:nth-child(1)").innerText.trim();
+            const itemsDetails = row.querySelector("td:nth-child(4)").innerText.trim();
+            const totalAmount = row.querySelector("td:nth-child(5)").innerText.trim();
+            // Set sub-option as selected and turn button green
+            selectedOption.textContent = `(Customer - ${subOption})`;
+            subDropdown.style.display = 'none';
+            button.classList.add('green');
+
+            // Send an email if "Instant" is selected
+            if (subOption === 'Instant') {
+                fetch("{{ url_for('send_mail') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email: customerEmail,
+                        name: customerName,
+                        b_name: b_name,
+                        overall_total: overall_total,
+                        purchase_date: purchaseDate,
+                        items_details: itemsDetails,
+                        total: totalAmount
+                    }),
+                })
+                    .then((response) => {
+                        if (response.ok) {
+                            alert("Notified Customer  successfully!");
+                        } else {
+                            alert("Failed to send email.");
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error:", error);
+                        alert("An error occurred while sending the email.");
+                    });
+            }
+        }
+    </script>
+
+    <div class="container mt-5">
+        <!-- Toast Container -->
+        <div id="toast-container" class="position-fixed bottom-0 end-0 p-3">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' }} border-0"
+                role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        {{ message }}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                        aria-label="Close"></button>
+                </div>
+            </div>
+            {% endfor %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <script>
+        // Initialize all Bootstrap toasts
+        document.addEventListener('DOMContentLoaded', function () {
+            var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+            var toastList = toastElList.map(function (toastEl) {
+                return new bootstrap.Toast(toastEl);
+            });
+            toastList.forEach(toast => toast.show());
+        });
+    </script>
+</body>
+
+</html>

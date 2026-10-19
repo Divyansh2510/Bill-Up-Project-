@@ -1,0 +1,310 @@
+/* Global Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    padding-top: 70px; /* Match the height of the fixed navbar */
+    background-color: #f8f9fa; /* Optional for a clean look */
+}
+
+ /* Navbar Customization */
+ #mainNav {
+    background-color: #ffffff !important; /* Set background to white */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add a subtle shadow for depth */
+  }
+  
+  #mainNav .navbar-brand {
+    color: #000000 !important; /* Ensure the navbar brand text is visible on white */
+  }
+  
+  #mainNav .nav-link {
+    color: #000000 !important; /* Set the navigation links to black */
+  }
+  
+  #mainNav .nav-link:hover {
+    color: #007bff !important; /* Change the link color on hover to blue */
+  }
+  html {
+    overflow-y: scroll; /* Ensures the scrollbar is always present */
+  }
+  .btn .small {
+    text-transform: none;
+}
+
+/* Customer Section */
+.customer-section {
+    margin: 0;
+    padding: 15px 20px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 18px;
+    font-weight: bold;
+    font-style: italic;
+}
+
+.customer-section .title {
+    flex: 1;
+    text-align: left;
+    margin: 0;
+    font-size: 24px;
+    
+}
+
+
+.customer-section .actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Search Bar */
+.customer-section .search form {
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.customer-section .search input {
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 5px;
+}
+
+.customer-section .search button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+/* Add New Button */
+.customer-section .add-new {
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.customer-section .add-new:hover {
+    background-color: #138496;
+}
+
+/* Dropdown */
+.customer-section .dropdown {
+    position: relative;
+}
+
+.customer-section .dropdown button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.customer-section .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 0;
+    list-style: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.customer-section .dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+.customer-section .dropdown-menu li {
+    padding: 5px 15px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.customer-section .dropdown-menu li:hover {
+    background-color: #f0f0f0;
+}
+
+/* Employee Table */
+.employee-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.employee-table th, 
+.employee-table td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #ccc;
+}
+
+.employee-table th {
+    background-color: #f4f4f4;
+}
+
+.employee {
+    display: flex;
+    align-items: center;
+}
+
+.employee .avatar {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+}
+
+.name {
+    font-weight: bold;
+}
+
+.email {
+    font-size: 0.9em;
+    color: #555;
+}
+
+/* Status Badges */
+.status {
+    padding: 5px 10px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.9em;
+}
+
+.status.active {
+    background-color: #28a745;
+}
+
+.status.onboarding {
+    background-color: #6c757d;
+}
+
+.status.awaiting {
+    background-color: #ffc107;
+    color: #333;
+}
+
+/* Action Links */
+.edit-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.edit-link:hover {
+    text-decoration: underline;
+}
+
+/* Adjust Row Height */
+.employee-table tbody tr {
+    height: 10px;
+    line-height: 10px;
+}
+
+/* Optional: Adjust the avatar size to match */
+.employee-table .avatar {
+    width: 30px;
+    height: 30px;
+}
+
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clickable-row:active {
+    background-color: #e0e0e0; /* Light grey color for click effect */
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2); /* Inner shadow effect */
+}
+
+.delete-btn {
+    width: 40px; /* Set the width */
+    height: 40px; /* Set the height */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0; /* Remove padding for precise size */
+    margin-left: 5px; /* Add a small gap if needed */
+}
+
+.delete-btn i {
+    font-size: 16px; /* Adjust icon size */
+}
+.no-entries {
+    text-align: center;
+    margin-top: 20%; /* Adjust as needed to center vertically */
+    font-size: 18px;
+    color: #666;
+}
+.previous {
+    background-color:green;
+    color: black;
+  }
+
+.title1{
+    
+    margin-right: 30px;
+    font-size: 24px;
+}
+.title2{
+    margin-right: 30px;
+    font-size: 24px;
+}
+.notification-container {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 5px 0;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    width: 150px;
+}
+
+.dropdown-menu .dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.dropdown-menu .dropdown-item:hover {
+    background-color: #f0f0f0;
+}
+
+.notification-btn.green {
+    background-color: #28a745 !important;
+    color: white;
+}
+
+.selected-option {
+    font-size: 12px;
+    margin-left: 8px;
+    color: #555;
+}
