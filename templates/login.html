@@ -13,11 +13,7 @@
 </head>
 
 <body>
-  <script>
-    {% if alert_message %}
-    alert("{{ alert_message }}");
-    {% endif %}
-  </script>
+
 <nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
   <div class="container-fluid px-4">
       <!-- Title with larger font size -->
@@ -64,16 +60,27 @@
 
             <!-- UserID input -->
             <div class="form-outline mb-4">
-              <input type="UserId" id="form3Example3" name="UserID" class="form-control form-control-lg"
-                placeholder="Enter a valid User Id" />
+              <input type="text" id="form3Example3" name="UserID" class="form-control form-control-lg"
+                placeholder="Enter a valid User Id" value="{{ user_id if user_id else '' }}" required />
               <label class="form-label" for="form3Example3">User Id</label>
             </div>
 
-            <!-- Password input -->
-            <div class="form-outline mb-3">
-              <input type="password" id="form3Example4"  minlength="8" maxlength="8" name="Password" class="form-control form-control-lg" placeholder="Enter password" />
+            <!-- Password input with eye icon -->
+            <div class="form-outline mb-3 position-relative">
+              <input type="password" id="form3Example4" minlength="8" maxlength="8" name="Password" class="form-control form-control-lg" placeholder="Enter password" required />
               <label class="form-label" for="form3Example4">Password</label>
+              <i class="fas fa-eye position-absolute" id="togglePassword" style="right: 15px; top: 18px; cursor: pointer; color: #666;"></i>
             </div>
+
+            <!-- Error message display -->
+            {% if error_message %}
+            <div class="alert alert-danger py-2 mb-3 d-flex align-items-center justify-content-between" role="alert" style="font-size: 0.9rem;" id="errorAlert">
+              <div>
+                <i class="fas fa-exclamation-circle me-2"></i>{{ error_message }}
+              </div>
+              <button type="button" class="btn-close" onclick="closeAlert()" aria-label="Close" style="font-size: 0.7rem; padding: 0; margin: 0; outline: none; box-shadow: none !important; opacity: 0.8; cursor: pointer;"></button>
+            </div>
+            {% endif %}
 
             <div class="d-flex justify-content-between align-items-center">
               <!-- Checkbox -->
@@ -87,7 +94,7 @@
             </div>
 
             <div class="text-center text-lg-start mt-4 pt-2">
-              <button type="submit" class="btn btn-primary btn-lg" style="padding-left: 2.5rem; padding-right: 2.5rem;">
+              <button type="submit" class="btn btn-primary btn-lg w-100" style="border-radius: 8px; padding: 12px 20px; font-size: 1rem; font-weight: 500;">
                 Login
               </button>
               <p class="small fw-bold mt-2 pt-1 mb-0">Don't have an account? <a href="{{ url_for('register') }}" class="link-danger">Register</a></p>
@@ -122,6 +129,44 @@
 
   <!-- MDBootstrap / Bootstrap JS -->
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+  
+  <!-- Password visibility toggle script -->
+  <script>
+    // Close alert function
+    function closeAlert() {
+      const alert = document.getElementById('errorAlert');
+      if (alert) {
+        alert.style.display = 'none';
+      }
+    }
+
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordField = document.getElementById('form3Example4');
+    
+    if (togglePassword) {
+      togglePassword.addEventListener('click', function() {
+        // Toggle the password field type
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+        
+        // Toggle the eye icon
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+      });
+    }
+
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+      const userId = document.getElementById('form3Example3').value.trim();
+      const password = document.getElementById('form3Example4').value.trim();
+      
+      if (!userId || !password) {
+        e.preventDefault();
+        alert('Please fill in all fields');
+        return false;
+      }
+    });
+  </script>
 </body>
 
 </html>

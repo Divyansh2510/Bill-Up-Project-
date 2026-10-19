@@ -56,9 +56,17 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        # Handlimg login form submission
-        user_id = request.form.get("UserID")  # Get UserId from form input
-        password = request.form.get("Password")  # Get Password from form input
+        # Handling login form submission
+        user_id = request.form.get("UserID", "").strip()  # Get UserId from form input
+        password = request.form.get("Password", "").strip()  # Get Password from form input
+
+        # Check for empty fields
+        if not user_id or not password:
+            return render_template(
+                "login.html", 
+                error_message="Please fill in all fields.",
+                user_id=user_id  # Preserve the entered UserID
+            )
 
         # Query user from the database
         user = Registration.query.filter_by(UserID=user_id).first()
@@ -72,7 +80,8 @@ def login():
         # Invalid credentials
         return render_template(
             "login.html", 
-            alert_message="Invalid UserID or Password. Please try again."
+            error_message="Wrong password or username entered. Please try again.",
+            user_id=user_id  # Preserve the entered UserID
         )
 
     # Render login page for GET requests
