@@ -4,176 +4,387 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registration Form</title>
+  <title>Register | Bill Up</title>
   <!-- MDBootstrap / Bootstrap CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
-  
-  
+
+  <style>
+    /* Page fills exactly one screen: navbar (fixed) + form area + footer */
+    body {
+      background-color: #f5f7fb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .register-section {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding-top: 96px;   /* room for the fixed navbar */
+      padding-bottom: 16px;
+    }
+
+    .register-illustration {
+      max-height: 60vh;
+      width: 100%;
+      object-fit: contain;
+    }
+
+    .register-card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .register-card .card-body {
+      padding: 1.5rem 1.75rem;
+    }
+
+    @media (max-width: 575.98px) {
+      .register-card .card-body {
+        padding: 1.25rem 1rem;
+      }
+    }
+
+    .register-title {
+      font-weight: 700;
+      font-size: 1.4rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .register-subtitle {
+      color: #6c757d;
+      font-size: 0.9rem;
+      margin-bottom: 1.1rem;
+    }
+
+    /* Extra row spacing leaves room for the small "passwords match" text */
+    .register-form .row {
+      --bs-gutter-x: 1rem;
+      --bs-gutter-y: 1.15rem;
+    }
+
+    .match-hint {
+      position: absolute;
+      left: 2px;
+      top: 100%;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #6c757d;
+      font-size: 0.9rem;
+      z-index: 2;
+    }
+
+    .password-input,
+    .password-input.is-invalid {
+      padding-right: 2.25rem;
+    }
+
+    /* The eye icon sits where Bootstrap draws its invalid "!" icon, so drop that icon here */
+    .password-input.is-invalid {
+      background-image: none;
+    }
+
+    /* MDB adds space below invalid fields, which pushes the page into scrolling */
+    .register-form .form-outline .form-control.is-invalid {
+      margin-bottom: 0;
+    }
+
+    .btn-register {
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .page-alert {
+      font-size: 0.85rem;
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/public.css') }}" rel="stylesheet">
 </head>
 
 <body>
-  <script>
-    // Check if an alert message is passed from the backend
-    {% if alert_message %}
-    alert("{{ alert_message }}");
-    {% endif %}
-</script>
-<nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
-  <div class="container-fluid px-4">
-      <!-- Title with larger font size -->
-      <a class="navbar-brand fw-bold" href="#page-top" style="font-size: 1.8rem;">
-        <i class='fas fa-clone mx-2' style='font-size:30px;color:blue' ></i>Bill Up</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-          Menu
-          <i class="bi-list"></i>
-      </button>
-      <div class="collapse navbar-collapse justify-content-end" id="navbarResponsive">
-          <ul class="navbar-nav me-4 my-3 my-lg-0">
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#features">About Us</a></li>
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#features">Features</a></li>
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#download">Team</a></li>
-          </ul>
-          <!-- Profile Icon -->
-          <a href="{{ url_for('index') }}" class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0">
-              <span class="d-flex align-items-center">
-                  
-                  <span class="small">Home</span>
-              </span>
-          </a>
-      </div>
-  </div>
-</nav>
-    
-  
-  <section class="container-fluid h-custom">
-    <div class="container-fluid h-custom">
-      <div class="row d-flex justify-content-center align-items-center h-100">
-        <div class="col-md-9 col-lg-6 col-xl-5">
-          <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp" class="img-fluid"
-            alt="Sample image">
+
+{% set active_page = 'register' %}
+{% include 'partials/public_navbar.html' %}
+
+  <section class="register-section">
+    <div class="container">
+      <div class="row justify-content-center align-items-center g-4">
+        <!-- Illustration (hidden on small screens) -->
+        <div class="col-lg-5 d-none d-lg-block text-center">
+          <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp"
+            class="register-illustration" alt="Illustration">
         </div>
-        <div class="col-md-8 col-lg-6 col-xl-4 offset-xl-1">
-          <form action="/register" method="POST"  onsubmit="return validateForm()">
-            <div class="d-flex flex-row align-items-center justify-content-center justify-content-lg-start mb-4">
-              <p class="lead fw-normal mb-0 me-3" style="margin-top: 120px;">Register with </p>
-              <button type="button"  style="margin-top: 120px;" class="btn btn-primary btn-floating mx-1 d-flex align-items-center justify-content-center">
-                <i class="fab fa-google"></i>
-              </button>              
+
+        <div class="col-12 col-md-10 col-lg-7 col-xl-6">
+          <div class="card register-card">
+            <div class="card-body">
+              <h1 class="register-title">Create your account</h1>
+              <p class="register-subtitle">Set up Bill Up for your business in a minute.</p>
+
+              <!-- Error message from the server -->
+              {% if alert_message %}
+              <div class="alert alert-danger page-alert py-2 mb-3 d-flex align-items-center justify-content-between" role="alert" id="errorAlert">
+                <div>
+                  <i class="fas fa-exclamation-circle me-2"></i>{{ alert_message }}
+                </div>
+                <button type="button" class="btn-close" onclick="closeAlert()" aria-label="Close" style="font-size: 0.65rem; box-shadow: none;"></button>
+              </div>
+              {% endif %}
+
+              {# Limits come from REGISTRATION_RULES in main.py, so the browser and server agree #}
+              {% set R = REGISTRATION_RULES %}
+              {% set errs = field_errors or {} %}
+              <form action="{{ url_for('register') }}" method="POST" id="registerForm" class="register-form" novalidate>
+                <div class="row">
+                  <!-- Business name / type -->
+                  <div class="col-sm-7">
+                    <div class="form-outline">
+                      <input type="text" name="bName" id="bName" class="form-control {{ 'is-invalid' if 'bName' in errs }}"
+                        maxlength="{{ R.bName.max }}" autocomplete="organization"
+                        value="{{ form_data.get('bName', '') if form_data else '' }}" required />
+                      <label class="form-label" for="bName">Business name</label>
+                    </div>
+                  </div>
+                  <div class="col-sm-5">
+                    <div class="form-outline">
+                      <input type="text" name="bType" id="bType" class="form-control {{ 'is-invalid' if 'bType' in errs }}"
+                        maxlength="{{ R.bType.max }}"
+                        value="{{ form_data.get('bType', '') if form_data else '' }}" />
+                      <label class="form-label" for="bType">Business type (optional)</label>
+                    </div>
+                  </div>
+
+                  <!-- Business address -->
+                  <div class="col-12">
+                    <div class="form-outline">
+                      <input type="text" name="bAddress" id="bAddress" class="form-control {{ 'is-invalid' if 'bAddress' in errs }}"
+                        maxlength="{{ R.bAddress.max }}" autocomplete="street-address"
+                        value="{{ form_data.get('bAddress', '') if form_data else '' }}" required />
+                      <label class="form-label" for="bAddress">Business address</label>
+                    </div>
+                  </div>
+
+                  <!-- User ID / Contact -->
+                  <div class="col-sm-6">
+                    <div class="form-outline">
+                      <input type="text" name="UserID" id="UserID" class="form-control {{ 'is-invalid' if 'UserID' in errs }}"
+                        maxlength="{{ R.UserID.max }}" autocomplete="username" autocapitalize="off" spellcheck="false"
+                        title="{{ R.UserID.min }}-{{ R.UserID.max }} characters: letters, numbers and _ , starting with a letter"
+                        value="{{ form_data.get('UserID', '') if form_data else '' }}" required />
+                      <label class="form-label" for="UserID">User ID (used to log in)</label>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="form-outline">
+                      <input type="tel" name="Contact" id="Contact" class="form-control {{ 'is-invalid' if 'Contact' in errs }}"
+                        inputmode="numeric" maxlength="{{ R.Contact.max }}" autocomplete="tel-national"
+                        value="{{ form_data.get('Contact', '') if form_data else '' }}" required />
+                      <label class="form-label" for="Contact">Contact number (10 digits)</label>
+                    </div>
+                  </div>
+
+                  <!-- Email -->
+                  <div class="col-12">
+                    <div class="form-outline">
+                      <input type="email" name="Email" id="Email" class="form-control {{ 'is-invalid' if 'Email' in errs }}"
+                        maxlength="{{ R.Email.max }}" autocomplete="email" autocapitalize="off" spellcheck="false"
+                        value="{{ form_data.get('Email', '') if form_data else '' }}" required />
+                      <label class="form-label" for="Email">Email</label>
+                    </div>
+                  </div>
+
+                  <!-- Password / Confirm -->
+                  <div class="col-sm-6">
+                    <div class="form-outline position-relative">
+                      <input type="password" name="Password" id="Password" class="form-control password-input {{ 'is-invalid' if 'Password' in errs }}"
+                        maxlength="{{ R.Password.max }}" autocomplete="new-password"
+                        title="Exactly 8 characters with a letter, a number and a symbol" required />
+                      <label class="form-label" for="Password">Password (8 characters)</label>
+                      <i class="fas fa-eye toggle-password" data-target="Password" title="Show password"></i>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="form-outline position-relative">
+                      <input type="password" name="ConfirmPassword" id="ConfirmPassword" class="form-control password-input {{ 'is-invalid' if 'ConfirmPassword' in errs }}"
+                        maxlength="{{ R.Password.max }}" autocomplete="new-password" required />
+                      <label class="form-label" for="ConfirmPassword">Confirm password</label>
+                      <i class="fas fa-eye toggle-password" data-target="ConfirmPassword" title="Show password"></i>
+                      <span class="match-hint" id="matchHint"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Client-side validation message -->
+                <div class="alert alert-warning page-alert py-2 mt-3 mb-0 d-none" role="alert" id="clientAlert"></div>
+
+                <button type="submit" class="btn btn-primary w-100 btn-register mt-4">
+                  Create account
+                </button>
+                <p class="small fw-bold text-center mt-2 mb-0">Already have an account? <a href="{{ url_for('login') }}" class="link-danger">Login</a></p>
+              </form>
             </div>
-
-            <div class="divider d-flex align-items-center my-4">
-              <p class="text-center fw-bold mx-3 mb-0">Or</p>
-            </div>
-
-            <!-- Bussiness Name input -->
-            <div class="form-outline mb-4">
-              <input type="text" name="bName" id="form3Example1" class="form-control form-control-lg"
-              value="{{ form_data.get('bName', '') if form_data else '' }}"  placeholder="Enter your Bussiness Name" />
-              <label class="form-label" for="form3Example1">Bussiness Name</label>
-              
-            </div>
-            <!-- Bussiness Address input -->
-            <div class="form-outline mb-4">
-              <input type="text"  name="bAddress" id="form3Example2" class="form-control form-control-lg"
-              value="{{ form_data.get('bAddress', '') if form_data else '' }}"  placeholder="Enter your Bussiness Address" />
-              <label class="form-label" for="form3Example2">Bussiness Address</label>
-            </div>
-
-            <!-- Business Type input -->
-<!-- <div class="form-outline mb-4">
-  <label class="form-label" for="businessTypeSelect">Business Type</label>
-  <select id="businessTypeSelect" class="form-control form-control-lg">
-    <option value="" disabled selected>Select your business type</option>
-    <option value="retail">Retail</option>
-    <option value="wholesale">Wholesale</option>
-    <option value="service">Service</option>
-    <option value="manufacturing">Manufacturing</option>
-    <option value="technology">Technology</option>
-    <option value="other">Other</option>
-  </select>
-</div> -->
-<!-- Bussiness Type input -->
-<div class="form-outline mb-4">
-  <input type="text" name="bType" id="form3Example9" class="form-control form-control-lg"
-  value="{{ form_data.get('bType', '') if form_data else '' }}"  placeholder="Enter Bussiness Type" />
-  <label class="form-label" for="form3Example9">Bussiness Type</label>
-</div>
-
-
-            <!-- User Id input -->
-            <div class="form-outline mb-4">
-              <input type="text" name="UserID" id="form3Example4" class="form-control form-control-lg"
-              value="{{ form_data.get('UserID', '') if form_data else '' }}"  placeholder="Enter a valid User Id" />
-              <label class="form-label" for="form3Example4">User Id</label>
-            </div>
-
-            <!-- User Email input -->
-            <div class="form-outline mb-4">
-              <input type="email" name="Email" id="form3Example5" class="form-control form-control-lg"
-              value="{{ form_data.get('Email', '') if form_data else '' }}"  placeholder="Enter a valid email" />
-              <label class="form-label" for="form3Example5">Email</label>
-            </div>
-
-            <!-- User Contact input -->
-            <div class="form-outline mb-4">
-              <input type="tel" minlength="10" maxlength="10"   pattern="^\d{10}$" name="Contact" id="form3Example6" class="form-control form-control-lg"
-              value="{{ form_data.get('Contact', '') if form_data else '' }}"  placeholder="Enter a valid phone number"  required/>
-              <label class="form-label" for="form3Example6">Contact No.</label>
-            </div>
-
-            <!-- Password input -->
-            <div class="form-outline mb-3">
-              <input type="password"  name="Password" maxlength="8" id="form3Example7" class="form-control form-control-lg" placeholder="Enter password (max limit 8 characters)" />
-              <label class="form-label" for="form3Example7">Password</label>
-            </div>
-
-            <!--Conmfirm Password input -->
-            <div class="form-outline mb-3">
-              <input type="ConfirmPassword" maxlength="8" name="ConfirmPassword" id="form3Example8" class="form-control form-control-lg" placeholder="Confirm password" />
-              <label class="form-label" for="form3Example8">Confirm Password</label>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center">
-             
-
-            <div class="text-center text-lg-start mt-4 pt-2">
-              <button type="submit" class="btn btn-primary btn-lg" style="padding-left: 2.5rem; padding-right: 2.5rem;">
-                Create Account
-              </button>
-              <p class="small fw-bold mt-2 pt-1 mb-0">Made the account? <a href="{{ url_for('login') }}" class="link-danger">Login</a></p>
-            </div>
-          </form>
+          </div>
         </div>
-      </div>
-    </div>
-    <div
-      class="d-flex flex-column flex-md-row text-center text-md-start justify-content-between py-4 px-4 px-xl-5 bg-primary">
-      <!-- Copyright -->
-      <div class="text-white mb-3 mb-md-0 ">
-        Copyright © 2025. All rights reserved.
-      </div>
-      <!-- Right -->
-      <div>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-facebook-f"></i>
-        </a>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-twitter"></i>
-        </a>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-google"></i>
-        </a>
-        <a href="#!" class="text-white">
-          <i class="fab fa-linkedin-in"></i>
-        </a>
       </div>
     </div>
   </section>
 
+  {% include 'partials/public_footer.html' %}
+
   <!-- MDBootstrap / Bootstrap JS -->
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+
+  <script>
+    // Close the server error alert (remove it: d-flex sets display:flex !important)
+    function closeAlert() {
+      const errorAlert = document.getElementById('errorAlert');
+      if (errorAlert) {
+        errorAlert.remove();
+      }
+    }
+
+    // Show / hide password
+    document.querySelectorAll('.toggle-password').forEach(function (icon) {
+      icon.addEventListener('click', function () {
+        const field = document.getElementById(this.dataset.target);
+        const show = field.getAttribute('type') === 'password';
+        field.setAttribute('type', show ? 'text' : 'password');
+        this.classList.toggle('fa-eye', !show);
+        this.classList.toggle('fa-eye-slash', show);
+        this.title = show ? 'Hide password' : 'Show password';
+      });
+    });
+
+    const form = document.getElementById('registerForm');
+    const contact = document.getElementById('Contact');
+    const password = document.getElementById('Password');
+    const confirmPassword = document.getElementById('ConfirmPassword');
+    const matchHint = document.getElementById('matchHint');
+    const clientAlert = document.getElementById('clientAlert');
+
+    // Allow digits only in the contact number
+    contact.addEventListener('input', function () {
+      this.value = this.value.replace(/\D/g, '').slice(0, 10);
+    });
+
+    // Live "passwords match" hint
+    function updateMatchHint() {
+      matchHint.classList.remove('text-danger', 'text-success');
+      if (!confirmPassword.value) {
+        matchHint.textContent = '';
+      } else if (password.value === confirmPassword.value) {
+        matchHint.textContent = 'Passwords match';
+        matchHint.classList.add('text-success');
+      } else {
+        matchHint.textContent = 'Passwords do not match';
+        matchHint.classList.add('text-danger');
+      }
+    }
+    password.addEventListener('input', updateMatchHint);
+    confirmPassword.addEventListener('input', updateMatchHint);
+
+    // ---------- Validation: the same rules the server uses (REGISTRATION_RULES in main.py) ----------
+    const RULES = {{ REGISTRATION_RULES | tojson }};
+    // tojson sorts object keys, so keep the form's field order separately
+    const FIELD_ORDER = {{ REGISTRATION_RULES.keys() | list | tojson }};
+    const COLLAPSE_SPACES = ['bName', 'bType', 'bAddress'];
+
+    function cleanValue(name, value) {
+      if (name === 'Password' || name === 'ConfirmPassword') return value;
+      value = value.trim();
+      if (COLLAPSE_SPACES.indexOf(name) !== -1) value = value.replace(/\s+/g, ' ');
+      return value;
+    }
+
+    function checkField(name, value) {
+      const rule = RULES[name];
+      if (!value) return rule.required ? rule.label + ' is required.' : null;
+      if (rule.min && rule.max && rule.min === rule.max && value.length !== rule.min) {
+        return rule.label + ' must be exactly ' + rule.min + ' characters.';
+      }
+      if (rule.min && value.length < rule.min) return rule.label + ' must be at least ' + rule.min + ' characters.';
+      if (rule.max && value.length > rule.max) return rule.label + ' cannot be longer than ' + rule.max + ' characters.';
+      if (!new RegExp(rule.pattern).test(value)) return rule.message + '.';
+      if (rule.needs_letter && !/[A-Za-z]/.test(value)) return rule.label + ' must contain at least one letter.';
+      return null;
+    }
+
+    function checkConfirm() {
+      if (!confirmPassword.value) return 'Please confirm your password.';
+      if (password.value !== confirmPassword.value) return 'Passwords do not match.';
+      return null;
+    }
+
+    // Marks every invalid field and returns the first problem in form order
+    function validateForm() {
+      let firstInvalid = null;
+      let message = '';
+      FIELD_ORDER.forEach(function (name) {
+        const input = form.elements[name];
+        input.value = cleanValue(name, input.value);
+        const error = checkField(name, input.value);
+        input.classList.toggle('is-invalid', !!error);
+        if (error && !firstInvalid) {
+          firstInvalid = input;
+          message = error;
+        }
+      });
+
+      const confirmError = checkConfirm();
+      confirmPassword.classList.toggle('is-invalid', !!confirmError);
+      if (confirmError && !firstInvalid) {
+        firstInvalid = confirmPassword;
+        message = confirmError;
+      }
+      return { firstInvalid: firstInvalid, message: message };
+    }
+
+    // Once a field is marked invalid, re-check it as soon as the user leaves it
+    FIELD_ORDER.concat(['ConfirmPassword']).forEach(function (name) {
+      const input = form.elements[name];
+      input.addEventListener('blur', function () {
+        if (!input.classList.contains('is-invalid')) return;
+        if (name === 'ConfirmPassword') {
+          input.classList.toggle('is-invalid', !!checkConfirm());
+        } else {
+          input.value = cleanValue(name, input.value);
+          input.classList.toggle('is-invalid', !!checkField(name, input.value));
+        }
+      });
+    });
+
+    form.addEventListener('submit', function (e) {
+      const result = validateForm();
+      if (result.firstInvalid) {
+        e.preventDefault();
+        closeAlert();
+        clientAlert.textContent = result.message;
+        clientAlert.classList.remove('d-none');
+        result.firstInvalid.focus();
+      } else {
+        clientAlert.classList.add('d-none');
+      }
+    });
+  </script>
 </body>
 
 </html>

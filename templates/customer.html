@@ -1,280 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customers | Bill Up</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/customer.css') }}" rel="stylesheet">
+</head>
+<body>
 
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Customer Section</title>
-      <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet" type="text/css" /> <!-- for icons -->
-      <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.css" rel="stylesheet">
-      <link href="{{ url_for('static', filename='css/customer.css') }}" rel="stylesheet">
-      <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
-      
-      <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
-      
-  </head>
-  <body>
-    <div class="container mt-5">
-        <!-- Toast Container -->
-        <div id="toast-container" class="position-fixed bottom-0 end-0 p-3">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% for category, message in messages %}
-                    <div class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' }} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true">
-                        <div class="d-flex">
-                            <div class="toast-body">
-                                {{ message }}
-                            </div>
-                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% endwith %}
-        </div>
-    </div>
+    {% set pending_count = customers | selectattr('overall_total') | list | length %}
 
-    <script>
-        // Initialize all Bootstrap toasts
-        document.addEventListener('DOMContentLoaded', function () {
-            var toastElList = [].slice.call(document.querySelectorAll('.toast'));
-            var toastList = toastElList.map(function (toastEl) {
-                return new bootstrap.Toast(toastEl);
-            });
-            toastList.forEach(toast => toast.show());
-        });
-    </script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-    const rows = document.querySelectorAll(".clickable-row");
-
-    rows.forEach(row => {
-        row.addEventListener("click", function (event) {
-            // Check if the clicked element is inside a button with the class delete-btn
-            if (event.target.closest(".delete-btn")) {
-                event.stopPropagation(); // Stop the event from bubbling up
-                return; // Prevent the default row click behavior
-            }
-
-            // Redirect to the specified URL
-            window.location = this.dataset.href;
-        });
-    });
-});
-
-async function deleteCustomer(customerId, rowElement) {
-    const confirmed = confirm("Are you sure you want to delete this customer and all associated data?");
-    if (!confirmed) return;
-
-    try {
-        const response = await fetch(`/delete_customer/${customerId}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-        });
-
-        if (response.ok) {
-            alert("Customer deleted successfully!");
-            rowElement.remove(); // Remove the row from the table
-        } else {
-            alert("Failed to delete the customer. Please try again.");
-        }
-    } catch (error) {
-        console.error("Error deleting customer:", error);
-        alert("An error occurred. Please try again.");
-    }
-}
-    </script>
-    
-    
-    
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top" id="mainNav">
         <div class="container-fluid px-4">
-            <!-- Title with larger font size -->
-            <a class="navbar-brand fw-bold" href="#page-top" style="font-size: 1.8rem;">
-                <i class='fas fa-clone mx-2' style='font-size:30px;color:blue' ></i>Bill Up</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-                Menu
-                <i class="bi-list"></i>
+            <a class="navbar-brand fw-bold" href="{{ url_for('customer') }}">
+                <i class="fas fa-clone mx-2" style="font-size:30px;color:blue"></i>Bill Up</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse justify-content-end" id="navbarResponsive">
-                <!-- Items aligned to the right corner -->
-                <div class="d-flex align-items-center">
-                    <span class="navbar-text me-3 fw-bold" style="font-size: 1.2rem;">
-                       Welcome , {{ b_name }} !
+                <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3 py-3 py-lg-0">
+                    <span class="nav-welcome me-lg-2">Welcome, <strong>{{ b_name }}</strong></span>
+                    <a href="#" class="btn btn-outline-primary nav-btn">
+                        <i class="fa-solid fa-shop"></i> Shop
+                    </a>
+                    <a href="#" class="btn btn-outline-primary nav-btn">
+                        <i class="fa-solid fa-language"></i> Language
+                    </a>
+                    <span class="nav-user">
+                        <span class="avatar avatar-sm">{{ user_id[:1] }}</span>{{ user_id }}
                     </span>
-                    <a href="#" class="btn btn-primary px-3 mb-2 mb-lg-0 me-3">
-                        <span class="d-flex align-items-center">
-                            <i class="fa-solid fa-shop me-2"></i> <!-- Add a Bootstrap margin class -->
-                            <span class="small">Shop</span>
-                        </span>
-                    </a>
-                    <a href="#" class="btn btn-primary px-3 mb-2 mb-lg-0 me-3">
-                        <span class="d-flex align-items-center">
-                            <i class="fa fa-language me-2"></i> <!-- Add a Bootstrap margin class -->
-                            <span class="small">Language</span>
-                        </span>
-                    </a>
-                    <!-- Profile Icon -->
-                    <a href="#" class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0 me-3">
-                        <span class="d-flex align-items-center">
-                            <i class="bi-person-circle me-2"></i>
-                            <span class="small">{{ user_id }}</span>
-                        </span>
-                    </a>
-                    <!-- Logout Button -->
-                    <a href="{{ url_for('logout') }}" class="btn btn-danger px-3 py-2 mb-2 mb-lg-0">
-                        <span class="d-flex align-items-center">
-                            <i class="fa fa-sign-out-alt me-2"></i>
-                            <span class="small">Logout</span>
-                        </span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger nav-btn">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
                     </a>
                 </div>
             </div>
         </div>
     </nav>
-    
-    
-  <div class="customer-section">
-    <div class="title">Customer Section</div>
-    <div class="actions">
-        <div>Total: <strong>₹ {{ overall_total_sum }}</strong></div>
-    
-        <div class="search">
-            <form action="{{ url_for('customer') }}" method="GET">
-                <input 
-                    type="text" 
-                    placeholder="Search here" 
-                    name="search" 
-                    value="{{ request.args.get('search', '') }}">
-                <button type="submit">
-                    <i class="fa fa-search"></i>
-                </button>
-            </form>
-        </div>
-        
-        
-        <!-- Add New Button -->
-        <a href="#" class="add-new" data-bs-toggle="modal" data-bs-target="#addNewModal">
-            <i class="fa fa-plus"></i> Add New
-        </a>        
-        <!-- Dropdown -->
-        <div class="dropdown">
-            <button>Sort By <i class="fa fa-caret-down"></i></button>
-            <ul class="dropdown-menu">
-                <li>A-Z</li>
-                <li>Amount</li>
-                <li>Date</li>
-            </ul>
-        </div>
-    </div>
-</div>
 
-<!-- No Customers Message -->
-{% if customers|length == 0 %}
-<div class="d-flex justify-content-center align-items-center" style="height: 50vh;">
-    {% if request.args.get('search') %}
-    <p class="text-center text-muted">
-        <span style="font-size: 4rem;">&#x1F614;</span><br>
-        No results found for "{{ request.args.get('search') }}".
-    </p>
-    {% else %}
-    <p class="text-center text-muted">
-        <span style="font-size: 12rem;">&#x263A;</span><br> 
-        No customer accounts. Add the accounts and it will be visible here.
-    </p>
-    {% endif %}
-</div>
-{% else %}
+    <main class="container-fluid px-4 page-wrap">
+        <!-- Page header -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+                <h1 class="page-title">Customers</h1>
+                <p class="page-subtitle">Manage your customers and keep track of pending payments.</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-add" data-bs-toggle="modal" data-bs-target="#addNewModal">
+                <i class="fa-solid fa-plus"></i> Add customer
+            </button>
+        </div>
 
-<!-- Customer Table -->
-<table class="employee-table">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Title</th>
-            <th>Payment Status</th>
-            <th>Contact</th>
-            <th>Amount</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for customer in customers %}
-        <tr class="clickable-row" data-href="{{ url_for('account', customer_name=customer['name']) }}">
-            <td>
-                <div class="employee">
-                    <!-- <img src="https://via.placeholder.com/40" alt="{{ customer.name }}" class="avatar"> -->
+        <!-- Summary -->
+        <div class="row g-3 mb-3">
+            <div class="col-sm-6 col-lg-4">
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="fa-solid fa-indian-rupee-sign"></i></div>
                     <div>
-                        <p class="name">{{ customer.name }}</p>
-                        <p class="email">{{ customer.email }}</p>
+                        <div class="stat-label">Total outstanding</div>
+                        <div class="stat-value" id="statTotal">₹ {{ "{:,}".format(overall_total_sum) }}</div>
                     </div>
                 </div>
-            </td>
-            <td>
-                <p>Software Engineer</p>
-                <p>IT department</p>
-            </td>
-            <td>
-                {% if customer.overall_total == 0 %}
-                <span class="status active"><b>Done</b></span>
-                {% else %}
-                <span class="status pending"><b>Pending</b></span>
-                {% endif %}
-            </td>
-            <td>{{ customer.contact }}</td>
-            <td>₹{{ customer.overall_total }}</td>
-            <td>
-                <button 
-                    class="btn btn-danger btn-sm delete-btn" 
-                    onclick="deleteCustomer({{ customer.id }}, this.closest('tr'))">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-{% endif %}
-<div class="modal fade" id="addNewModal" tabindex="-1" aria-labelledby="addNewModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="addNewModalLabel">Add New Customer</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                    <div>
+                        <div class="stat-label">{{ 'Matching customers' if request.args.get('search') else 'Customers' }}</div>
+                        <div class="stat-value" id="statCount">{{ customers | length }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-12 col-lg-4">
+                <div class="stat-card">
+                    <div class="stat-icon amber"><i class="fa-solid fa-hourglass-half"></i></div>
+                    <div>
+                        <div class="stat-label">Payments pending</div>
+                        <div class="stat-value" id="statPending">{{ pending_count }}</div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <form action="{{ url_for('add_customer') }}" method="POST">
-          <div class="modal-body">
-            <div class="mb-3">
-              <label for="customerName" class="form-label">Customer Name</label>
-              <input type="text" class="form-control" id="customerName" name="customer_name" required>
+
+        <!-- Customer list -->
+        <div class="list-card">
+            <div class="list-toolbar">
+                <form class="search-box" action="{{ url_for('customer') }}" method="GET" role="search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" class="form-control" placeholder="Search customers by name" name="search"
+                        value="{{ request.args.get('search', '') }}" aria-label="Search customers">
+                    {% if request.args.get('search') %}
+                    <a href="{{ url_for('customer') }}" class="clear-search" title="Clear search"><i class="fa-solid fa-xmark"></i></a>
+                    {% endif %}
+                </form>
+
+                {% if customers|length > 1 %}
+                <label class="sort-box mb-0">
+                    Sort by
+                    <select class="form-select" id="sortSelect">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="name">Name (A–Z)</option>
+                        <option value="amount">Amount (high to low)</option>
+                    </select>
+                </label>
+                {% endif %}
             </div>
-            <div class="mb-3">
-              <label for="customerEmail" class="form-label">Email</label>
-              <input type="email" class="form-control" id="customerEmail" name="customer_email">
+
+            {% if customers|length == 0 %}
+            <!-- Empty state -->
+            <div class="empty-state">
+                {% if request.args.get('search') %}
+                <div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                <h2>No results for "{{ request.args.get('search') }}"</h2>
+                <p>Try a different name, or clear the search to see all customers.</p>
+                <a href="{{ url_for('customer') }}" class="btn btn-outline-primary">Clear search</a>
+                {% else %}
+                <div class="empty-icon"><i class="fa-solid fa-user-plus"></i></div>
+                <h2>No customers yet</h2>
+                <p>Add your first customer to start recording their bills.</p>
+                <button type="button" class="btn btn-primary btn-add" data-bs-toggle="modal" data-bs-target="#addNewModal">
+                    <i class="fa-solid fa-plus"></i> Add customer
+                </button>
+                {% endif %}
             </div>
-            <div class="mb-3">
-              <label for="customerContact" class="form-label">Contact No.</label>
-              <input type="tel" class="form-control" id="customerContact" name="customer_contact" minlength="10" maxlength="10"   pattern="^\d{10}$">
+            {% else %}
+            <div class="table-responsive">
+                <table class="table customer-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th class="hide-sm">Contact</th>
+                            <th>Status</th>
+                            <th class="text-end">Amount due</th>
+                            <th class="text-end" style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customerRows">
+                        {% for customer in customers %}
+                        <tr class="clickable-row" data-href="{{ url_for('account', customer_name=customer['name']) }}"
+                            data-id="{{ customer.id }}" data-name="{{ customer.name | lower }}" data-amount="{{ customer.overall_total }}">
+                            <td>
+                                <div class="customer-cell">
+                                    <div class="avatar">{{ customer.name[:1] }}</div>
+                                    <div>
+                                        <p class="customer-name">{{ customer.name }}</p>
+                                        {% if customer.email %}<p class="customer-email">{{ customer.email }}</p>{% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="hide-sm">{{ customer.contact or '—' }}</td>
+                            <td>
+                                {% if customer.overall_total == 0 %}
+                                <span class="status done">Done</span>
+                                {% else %}
+                                <span class="status pending">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-amount">₹ {{ "{:,}".format(customer.overall_total) }}</td>
+                            <td class="text-end">
+                                <button type="button" class="delete-btn" title="Delete customer"
+                                    aria-label="Delete {{ customer.name }}"
+                                    onclick="deleteCustomer({{ customer.id }}, this.closest('tr'))">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="submit" class="btn btn-primary">Save</button>
-          </div>
-        </form>
-      </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Add customer modal -->
+    <div class="modal fade" id="addNewModal" tabindex="-1" aria-labelledby="addNewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addNewModalLabel">Add new customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ url_for('add_customer') }}" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="customerName" class="form-label">Customer name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="customerName" name="customer_name" maxlength="100"
+                                placeholder="e.g. Ravi Kumar" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="customerEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="customerEmail" name="customer_email" maxlength="100"
+                                placeholder="name@example.com">
+                        </div>
+                        <div>
+                            <label for="customerContact" class="form-label">Contact number</label>
+                            <input type="tel" class="form-control" id="customerContact" name="customer_contact"
+                                inputmode="numeric" minlength="10" maxlength="10" pattern="^\d{10}$" placeholder="10-digit number"
+                                title="Enter a 10-digit number">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save customer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/umd/popper.min.js" 
-  integrity="sha384-oBqDVmMz4fnFO9gybvu8X0ZLCBU+PQoeiD6D8/hWqFfMW3HDZXuJjBw6Uw/SKc3q" 
-  crossorigin="anonymous"></script>
+    <!-- Toasts -->
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="toast align-items-center text-bg-{{ 'success' if category == 'success' else 'danger' }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">{{ message }}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+            {% endfor %}
+        {% endwith %}
+    </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.min.js" integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/confirm-dialog.js') }}"></script>
+    <script>
+        // Show a toast message (used for flashed messages and after deleting)
+        function showToast(message, success) {
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast align-items-center border-0 text-bg-' + (success ? 'success' : 'danger');
+            toastEl.setAttribute('role', 'alert');
+            toastEl.innerHTML = '<div class="d-flex"><div class="toast-body"></div>' +
+                '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+            toastEl.querySelector('.toast-body').textContent = message;
+            document.getElementById('toast-container').appendChild(toastEl);
+            new bootstrap.Toast(toastEl).show();
+        }
 
+        document.addEventListener('DOMContentLoaded', function () {
+            // Flashed messages from the server
+            document.querySelectorAll('#toast-container .toast').forEach(function (toastEl) {
+                new bootstrap.Toast(toastEl).show();
+            });
+
+            // Open the customer's account when a row is clicked
+            document.querySelectorAll('.clickable-row').forEach(function (row) {
+                row.addEventListener('click', function (event) {
+                    if (event.target.closest('.delete-btn')) {
+                        return;
+                    }
+                    window.location = this.dataset.href;
+                });
+            });
+
+            // Digits only in the contact number
+            const contactInput = document.getElementById('customerContact');
+            contactInput.addEventListener('input', function () {
+                this.value = this.value.replace(/\D/g, '').slice(0, 10);
+            });
+
+            // Focus the name field when the modal opens
+            document.getElementById('addNewModal').addEventListener('shown.bs.modal', function () {
+                document.getElementById('customerName').focus();
+            });
+
+            // Sorting (remembered per browser)
+            const sortSelect = document.getElementById('sortSelect');
+            if (sortSelect) {
+                try {
+                    const saved = localStorage.getItem('billup-customer-sort');
+                    if (saved) sortSelect.value = saved;
+                } catch (e) {}
+                sortSelect.addEventListener('change', function () {
+                    try { localStorage.setItem('billup-customer-sort', this.value); } catch (e) {}
+                    sortRows(this.value);
+                });
+                sortRows(sortSelect.value);
+            }
+        });
+
+        function sortRows(mode) {
+            const tbody = document.getElementById('customerRows');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort(function (a, b) {
+                if (mode === 'name') return a.dataset.name.localeCompare(b.dataset.name);
+                if (mode === 'amount') return Number(b.dataset.amount) - Number(a.dataset.amount);
+                if (mode === 'oldest') return Number(a.dataset.id) - Number(b.dataset.id);
+                return Number(b.dataset.id) - Number(a.dataset.id); // newest
+            });
+            rows.forEach(function (row) { tbody.appendChild(row); });
+        }
+
+        // Recalculate the summary cards from the rows still on the page
+        function refreshStats() {
+            const rows = document.querySelectorAll('#customerRows tr');
+            let total = 0;
+            let pending = 0;
+            rows.forEach(function (row) {
+                const amount = Number(row.dataset.amount) || 0;
+                total += amount;
+                if (amount !== 0) pending += 1;
+            });
+            document.getElementById('statTotal').textContent = '₹ ' + total.toLocaleString('en-US');
+            document.getElementById('statCount').textContent = rows.length;
+            document.getElementById('statPending').textContent = pending;
+            if (rows.length === 0) {
+                window.location.reload(); // show the empty state
+            }
+        }
+
+        async function deleteCustomer(customerId, rowElement) {
+            const name = rowElement.querySelector('.customer-name').textContent;
+            const confirmed = await confirmDialog({
+                title: 'Delete customer?',
+                message: '"' + name + '" and all of their bills will be permanently deleted. This cannot be undone.',
+                confirmText: 'Delete customer',
+            });
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`/delete_customer/${customerId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (response.ok) {
+                    rowElement.remove();
+                    refreshStats();
+                    showToast('Customer deleted successfully.', true);
+                } else {
+                    showToast('Failed to delete the customer. Please try again.', false);
+                }
+            } catch (error) {
+                console.error('Error deleting customer:', error);
+                showToast('An error occurred. Please try again.', false);
+            }
+        }
+    </script>
 </body>
-  </html>
-  
+</html>

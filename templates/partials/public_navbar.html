@@ -1,0 +1,45 @@
+{# Navbar shared by the home, login and register pages.
+   Set `active_page` ('home', 'login' or 'register') before including it.
+   Styles: static/css/public.css #}
+<nav class="pub-nav" id="pubNav">
+  <div class="pub-nav-inner">
+    <a class="pub-brand" href="{{ url_for('index') }}">
+      <i class="fas fa-clone"></i>Bill Up
+    </a>
+
+    <button type="button" class="pub-toggle" id="pubNavToggle" aria-controls="pubNavMenu" aria-expanded="false" aria-label="Toggle navigation">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <div class="pub-menu" id="pubNavMenu">
+      <ul class="pub-links">
+        <li><a href="{{ url_for('index') }}" class="{{ 'active' if active_page == 'home' }}">Home</a></li>
+        <li><a href="{{ url_for('index') }}#about">About Us</a></li>
+        <li><a href="{{ url_for('index') }}#features">Features</a></li>
+        <li><a href="{{ url_for('index') }}#testimonials">Team</a></li>
+      </ul>
+      <div class="pub-actions">
+        <a href="#" class="pub-btn pub-btn-outline">
+          <i class="fas fa-language"></i> Language
+        </a>
+        <a href="{{ url_for('login') }}" class="pub-btn pub-btn-outline {{ 'active' if active_page == 'login' }}">
+          <i class="fas fa-sign-in-alt"></i> Login
+        </a>
+        <a href="{{ url_for('register') }}" class="pub-btn pub-btn-primary {{ 'active' if active_page == 'register' }}">
+          <i class="fas fa-user-plus"></i> Sign up
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+<script>
+  // Mobile menu toggle (works without Bootstrap/MDB JavaScript)
+  (function () {
+    var toggle = document.getElementById('pubNavToggle');
+    var menu = document.getElementById('pubNavMenu');
+    toggle.addEventListener('click', function () {
+      var open = menu.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  })();
+</script>

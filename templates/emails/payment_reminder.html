@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment reminder</title>
+</head>
+<!-- Email clients ignore <style> blocks and external CSS, so every style is inline -->
+<body style="margin:0; padding:0; background-color:#f4f6fb; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#1f2937;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f6fb;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+          <!-- Brand -->
+          <tr>
+            <td style="padding:0 4px 16px; font-size:22px; font-weight:700; color:#1f2937;">
+              <span style="display:inline-block; width:12px; height:12px; background-color:#1266f1; border-radius:3px; margin-right:8px;"></span>{{ b_name }}
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#ffffff; border:1px solid #e6e9f0; border-radius:14px; overflow:hidden;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                <!-- Header band -->
+                <tr>
+                  <td style="background-color:{{ '#fff7ed' if recipient == 'owner' else '#eef3ff' }}; padding:24px 28px; border-bottom:1px solid #e6e9f0;">
+                    <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{{ '#c2410c' if recipient == 'owner' else '#1266f1' }};">
+                      {{ 'Your reminder' if recipient == 'owner' else 'Payment reminder' }}
+                    </div>
+                    <div style="font-size:30px; font-weight:700; margin-top:6px; color:#1f2937;">{{ amount }}</div>
+                    <div style="font-size:14px; color:#6b7280; margin-top:4px;">Due on <strong style="color:#1f2937;">{{ due_date }}</strong></div>
+                  </td>
+                </tr>
+
+                <!-- Message -->
+                <tr>
+                  <td style="padding:24px 28px 8px; font-size:15px; line-height:1.6;">
+                    {% if recipient == 'owner' %}
+                    <p style="margin:0 0 12px;">Hi {{ b_name }},</p>
+                    <p style="margin:0;">This is the reminder you set: <strong>{{ customer_name }}</strong> has a pending payment of <strong>{{ amount }}</strong> due today.</p>
+                    {% else %}
+                    <p style="margin:0 0 12px;">Dear {{ customer_name }},</p>
+                    <p style="margin:0;">This is a gentle reminder from <strong>{{ b_name }}</strong> about a pending payment of <strong>{{ amount }}</strong>. Here are the details of the purchase:</p>
+                    {% endif %}
+                  </td>
+                </tr>
+
+                <!-- Details -->
+                <tr>
+                  <td style="padding:16px 28px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e6e9f0; border-radius:10px; font-size:14px;">
+                      {% if recipient == 'owner' %}
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280; width:40%; border-bottom:1px solid #e6e9f0;">Customer</td>
+                        <td style="padding:12px 16px; font-weight:600; border-bottom:1px solid #e6e9f0;">{{ customer_name }}</td>
+                      </tr>
+                      {% endif %}
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280; width:40%; border-bottom:1px solid #e6e9f0;">Purchase date</td>
+                        <td style="padding:12px 16px; font-weight:600; border-bottom:1px solid #e6e9f0;">{{ purchase_date }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280; border-bottom:1px solid #e6e9f0;">Due date</td>
+                        <td style="padding:12px 16px; font-weight:600; border-bottom:1px solid #e6e9f0;">{{ due_date }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280; vertical-align:top; border-bottom:1px solid #e6e9f0;">Notes</td>
+                        <td style="padding:12px 16px; border-bottom:1px solid #e6e9f0; word-break:break-word;">{{ notes }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280; vertical-align:top; border-bottom:1px solid #e6e9f0;">Items</td>
+                        <td style="padding:12px 16px; border-bottom:1px solid #e6e9f0; word-break:break-word;">{{ items }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 16px; color:#6b7280;">Amount due</td>
+                        <td style="padding:12px 16px; font-weight:700; color:#dc2626;">{{ amount }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Outstanding total -->
+                <tr>
+                  <td style="padding:0 28px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f9fafb; border-radius:10px; font-size:14px;">
+                      <tr>
+                        <td style="padding:14px 16px; color:#6b7280;">
+                          {{ 'Total outstanding from ' ~ customer_name if recipient == 'owner' else 'Your total outstanding balance' }}
+                        </td>
+                        <td align="right" style="padding:14px 16px; font-size:16px; font-weight:700;">{{ outstanding }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Closing -->
+                <tr>
+                  <td style="padding:0 28px 28px; font-size:14px; line-height:1.6; color:#6b7280;">
+                    {% if recipient == 'owner' %}
+                    You may want to contact {{ customer_name }} today about this payment.
+                    {% else %}
+                    If you have already made this payment, please ignore this email.<br>
+                    Thank you for shopping with us!<br><br>
+                    <span style="color:#1f2937;">Warm regards,<br><strong>{{ b_name }}</strong></span>
+                    {% endif %}
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:18px 8px 0; font-size:12px; color:#9ca3af;">
+              Sent with Bill Up on behalf of {{ b_name }}
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,236 @@
+/* Admin dashboard. Shared look (navbar, cards, table, modal) comes from customer.css. */
+
+.admin-tag {
+    margin-left: 0.6rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #c2410c;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.admin-updated {
+    color: var(--bu-muted);
+    font-size: 0.82rem;
+}
+
+.admin-updated i {
+    margin-right: 0.3rem;
+}
+
+.stat-icon.green { background: var(--bu-success-soft); color: var(--bu-success); }
+
+.stat-sub {
+    color: var(--bu-muted);
+    font-size: 0.75rem;
+    margin-top: 0.1rem;
+}
+
+/* ---------- Panels (chart, top list) ---------- */
+.panel-card {
+    background: var(--bu-card);
+    border: 1px solid var(--bu-border);
+    border-radius: var(--bu-radius);
+    box-shadow: var(--bu-shadow);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.9rem;
+}
+
+.panel-head h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.panel-head span {
+    color: var(--bu-muted);
+    font-size: 0.8rem;
+}
+
+.chart-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 220px;
+}
+
+.top-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.9rem;
+}
+
+.top-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+
+.top-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.top-amount {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.top-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: #f1f3f7;
+    overflow: hidden;
+}
+
+.top-bar span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f87171, #dc2626);
+}
+
+.panel-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--bu-muted);
+    font-size: 0.9rem;
+}
+
+.panel-empty i {
+    color: var(--bu-success);
+}
+
+/* ---------- Table ---------- */
+.user-chip {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    background: #f3f4f6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+}
+
+.contact-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.85rem;
+}
+
+.contact-cell i {
+    width: 16px;
+    margin-right: 0.35rem;
+    color: var(--bu-muted);
+    font-size: 0.75rem;
+}
+
+.cell-date {
+    white-space: nowrap;
+}
+
+.row-actions {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--bu-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.icon-btn:hover {
+    background: #eef3ff;
+    color: var(--bu-primary);
+    border-color: #d6e4ff;
+}
+
+.icon-btn.delete-btn:hover {
+    background: var(--bu-danger-soft);
+    color: var(--bu-danger);
+    border-color: #fecaca;
+}
+
+/* ---------- Details modal ---------- */
+.detail-stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.detail-stats div {
+    background: #f9fafb;
+    border: 1px solid var(--bu-border);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+}
+
+.detail-stats span,
+.detail-grid dt {
+    display: block;
+    color: var(--bu-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
+
+.detail-stats strong {
+    font-size: 1.1rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.5rem;
+    margin: 0;
+}
+
+.detail-grid .full {
+    grid-column: 1 / -1;
+}
+
+.detail-grid dd {
+    margin: 0;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+@media (max-width: 767.98px) {
+    .detail-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}

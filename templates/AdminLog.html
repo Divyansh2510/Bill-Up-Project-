@@ -4,123 +4,224 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title> Admin Login </title>
+  <title>Admin Login | Bill Up</title>
   <!-- MDBootstrap / Bootstrap CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
-  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/public.css') }}" rel="stylesheet">
+
+  <style>
+    /* Navbar (fixed) + login card + footer fill exactly one screen */
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-color: #f5f7fb;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .admin-section {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding-top: 92px; /* room for the fixed navbar */
+      padding-bottom: 16px;
+    }
+
+    .admin-section > .container {
+      width: 100%;
+    }
+
+    .admin-illustration {
+      max-height: 60vh;
+      width: 100%;
+      object-fit: contain;
+    }
+
+    .admin-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
+    .admin-card .card-body {
+      padding: 1.6rem 1.9rem;
+    }
+
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      background: #fff7ed;
+      color: #c2410c;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 0.7rem;
+    }
+
+    .admin-title {
+      font-weight: 700;
+      font-size: 1.6rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .admin-subtitle {
+      color: #6c757d;
+      font-size: 0.925rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #6c757d;
+      z-index: 2;
+    }
+
+    .password-input {
+      padding-right: 2.75rem;
+    }
+
+    .btn-admin {
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: none;
+    }
+
+    .admin-note {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      margin-top: 1rem;
+      color: #6c757d;
+      font-size: 0.8rem;
+    }
+
+    .back-home {
+      color: #6c757d;
+      font-size: 0.875rem;
+      text-decoration: none;
+    }
+
+    .back-home:hover {
+      color: #1266f1;
+    }
+  </style>
 </head>
 
 <body>
-  <script>
-    {% if alert_message %}
-    alert("{{ alert_message }}");
-    {% endif %}
-  </script>
-<nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
-  <div class="container px-5">
-      <!-- Title with larger font size -->
-      <a class="navbar-brand fw-bold" href="#page-top" style="font-size: 1.8rem;">
-        <i class='fas fa-clone mx-2' style='font-size:30px;color:blue' ></i>Bill Up</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-          Menu
-          <i class="bi-list"></i>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarResponsive">
-          <ul class="navbar-nav ms-auto me-4 my-3 my-lg-0">
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#features">About Us</a></li>
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#features">Features</a></li>
-              <li class="nav-item"><a class="nav-link me-lg-3" href="#download">Team</a></li>
-          </ul>
-          <!-- Profile Icon -->
-          <a href="{{ url_for('index') }}" class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0">
-              <span class="d-flex align-items-center">
-                  
-                  <span class="small">Home</span>
-              </span>
-          </a>
-      </div>
-  </div>
-</nav>
-    
-  
-  <section class="vh-100">
-    <div class="container-fluid h-custom">
-      <div class="row d-flex justify-content-center align-items-center h-100">
-        <div class="col-md-9 col-lg-6 col-xl-5">
-          <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp" class="img-fluid"
-            alt="Sample image">
+
+  {% set active_page = 'admin' %}
+  {% include 'partials/public_navbar.html' %}
+
+  <section class="admin-section">
+    <div class="container">
+      <div class="row justify-content-center align-items-center g-5">
+        <!-- Illustration (hidden on small screens) -->
+        <div class="col-lg-6 d-none d-lg-block text-center">
+          <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp"
+            class="admin-illustration" alt="Illustration">
         </div>
-        <div class="col-md-8 col-lg-6 col-xl-4 offset-xl-1">
-          <form action="/AdminLog" method="POST">
-            <div class="d-flex flex-row align-items-center justify-content-center justify-content-lg-start mb-4">
-              <p class="lead fw-normal mb-0 me-3"> Admin Login</p>
-            </div>
 
-            <div class="divider d-flex align-items-center my-4">
-            </div>
+        <div class="col-12 col-md-8 col-lg-6">
+          <div class="card admin-card">
+            <div class="card-body">
+              <span class="admin-badge"><i class="fas fa-user-shield"></i> Administrator</span>
+              <h1 class="admin-title">Admin login</h1>
+              <p class="admin-subtitle">Sign in to manage registered businesses.</p>
 
-            <!-- UserID input -->
-            <div class="form-outline mb-4">
-              <input type="UserId" id="form3Example3" name="UserID" class="form-control form-control-lg"
-                placeholder="Enter a valid User Id" />
-              <label class="form-label" for="form3Example3">User Id</label>
-            </div>
-
-            <!-- Password input -->
-            <div class="form-outline mb-3">
-              <input type="password" id="form3Example4"  name="Password" class="form-control form-control-lg" placeholder="Enter password" />
-              <label class="form-label" for="form3Example4">Password</label>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center">
-              <!-- Checkbox -->
-              <div class="form-check mb-0">
-                <input class="form-check-input me-2" name="form3Example3" type="checkbox" value="" id="form2Example3" />
-                <label class="form-check-label" for="form2Example3">
-                  Remember me
-                </label>
+              <!-- Error message from the server -->
+              {% if alert_message %}
+              <div class="alert alert-danger py-2 mb-3 d-flex align-items-center justify-content-between" role="alert" style="font-size: 0.9rem;" id="errorAlert">
+                <div>
+                  <i class="fas fa-exclamation-circle me-2"></i>{{ alert_message }}
+                </div>
+                <button type="button" class="btn-close" onclick="closeAlert()" aria-label="Close" style="font-size: 0.65rem; box-shadow: none;"></button>
               </div>
-              <a href="#!" class="text-body">Forgot password?</a>
-            </div>
+              {% endif %}
 
-            <div class="text-center text-lg-start mt-4 pt-2">
-              <button type="submit" class="btn btn-primary btn-lg" style="padding-left: 2.5rem; padding-right: 2.5rem;">
-                Login
-              </button>
-              
+              <form action="{{ url_for('AdminLog') }}" method="POST" id="adminForm">
+                <!-- Admin ID -->
+                <div class="form-outline mb-3">
+                  <input type="text" id="adminUserId" name="UserID" class="form-control form-control-lg"
+                    autocomplete="username" autocapitalize="off" spellcheck="false" required />
+                  <label class="form-label" for="adminUserId">Admin ID</label>
+                </div>
+
+                <!-- Password with show / hide -->
+                <div class="form-outline mb-2 position-relative">
+                  <input type="password" id="adminPassword" name="Password" class="form-control form-control-lg password-input"
+                    autocomplete="current-password" required />
+                  <label class="form-label" for="adminPassword">Password</label>
+                  <i class="fas fa-eye toggle-password" id="togglePassword" title="Show password"></i>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100 btn-admin mt-3">
+                  <i class="fas fa-sign-in-alt me-2"></i>Login to dashboard
+                </button>
+              </form>
+
+              <div class="admin-note">
+                <i class="fas fa-lock mt-1"></i>
+                <span>This area is for Bill Up administrators only. Business owners should use the regular <a href="{{ url_for('login') }}">login page</a>.</span>
+              </div>
+              <div class="text-center mt-2">
+                <a href="{{ url_for('index') }}" class="back-home"><i class="fas fa-arrow-left me-1"></i> Back to home</a>
+              </div>
             </div>
-          </form>
+          </div>
         </div>
-      </div>
-    </div>
-    <div
-      class="d-flex flex-column flex-md-row text-center text-md-start justify-content-between py-4 px-4 px-xl-5 bg-primary">
-      <!-- Copyright -->
-      <div class="text-white mb-3 mb-md-0">
-        Copyright © 2025. All rights reserved.
-      </div>
-      <!-- Right -->
-      <div>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-facebook-f"></i>
-        </a>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-twitter"></i>
-        </a>
-        <a href="#!" class="text-white me-4">
-          <i class="fab fa-google"></i>
-        </a>
-        <a href="#!" class="text-white">
-          <i class="fab fa-linkedin-in"></i>
-        </a>
       </div>
     </div>
   </section>
 
+  {% include 'partials/public_footer.html' %}
+
   <!-- MDBootstrap / Bootstrap JS -->
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+  <script>
+    // Close the error alert (remove it: d-flex sets display:flex !important)
+    function closeAlert() {
+      const errorAlert = document.getElementById('errorAlert');
+      if (errorAlert) {
+        errorAlert.remove();
+      }
+    }
+
+    // Show / hide password
+    document.getElementById('togglePassword').addEventListener('click', function () {
+      const field = document.getElementById('adminPassword');
+      const show = field.getAttribute('type') === 'password';
+      field.setAttribute('type', show ? 'text' : 'password');
+      this.classList.toggle('fa-eye', !show);
+      this.classList.toggle('fa-eye-slash', show);
+      this.title = show ? 'Hide password' : 'Show password';
+    });
+
+    // Don't submit an empty form
+    document.getElementById('adminForm').addEventListener('submit', function (e) {
+      const userId = document.getElementById('adminUserId');
+      const password = document.getElementById('adminPassword');
+      userId.value = userId.value.trim();
+      if (!userId.value || !password.value) {
+        e.preventDefault();
+        (userId.value ? password : userId).focus();
+      }
+    });
+  </script>
 </body>
 
 </html>

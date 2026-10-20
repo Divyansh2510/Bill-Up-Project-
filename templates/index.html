@@ -1,221 +1,312 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <meta name="description" content="" />
-        <meta name="author" content="" />
-        <title>Bill Up</title>
-        <!-- Favicon-->
-        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}" />
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Bill Up helps small businesses and local shops track customer bills, pending payments and send automatic email reminders." />
+  <title>Bill Up | Billing & payment reminders for small businesses</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+  <!-- Core theme CSS (includes Bootstrap) -->
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/public.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+</head>
 
-        <!-- Bootstrap icons-->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet" type="text/css" />
-        <!-- Google fonts-->
-        <!-- <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700,300italic,400italic,700italic" rel="stylesheet" type="text/css" /> -->
-        <!-- Core theme CSS (includes Bootstrap)-->
-        <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
-    </head>
-    <body>
-        <nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
-            <div class="container-fluid px-4">
-                <!-- Title with larger font size -->
-                <img style="background-image: url('static/img/logo.png')" alt="">
-                <a class="navbar-brand fw-bold" href="#page-top" style="font-size: 1.8rem;">
-                    <i class='fas fa-clone' style='font-size:30px;color:blue'></i>
-                    Bill Up</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-                    Menu
-                    <i class="bi-list"></i>
-                </button>
-                <div class="collapse navbar-collapse justify-content-end" id="navbarResponsive">
-                    <ul class="navbar-nav me-4  my-3 my-lg-0">
-                        <li class="nav-item"><a class="nav-link me-lg-3" href="#download">About Us</a></li>
-                        <li class="nav-item"><a class="nav-link me-lg-3" href="#features">Features</a></li>
-                        <li class="nav-item"><a class="nav-link me-lg-3" href="#download">Team</a></li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle me-lg-3" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Language</a>
-                            <ul class="dropdown-menu" aria-labelledby="languageDropdown">
-                                <li><a class="dropdown-item" href="#" onclick="changeLanguage('en')">English</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="changeLanguage('hi')">हिंदी</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="changeLanguage('es')">Español</a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                    
-                    <!-- Profile Icon -->
-                    <a href="{{ url_for('login') }}" class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0">
-                        <span class="d-flex align-items-center">
-                            <i class="bi-person-circle me-2"></i> <!-- Profile icon -->
-                            <span class="small">Login</span>
-                        </span>
-                    </a>
-                </div>
-            </div>
-        </nav>
-        
-        <!-- Masthead-->
-        
-            <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/index2.webp') }}')">
-            <div class="container position-relative">
-                <div class="row justify-content-center">
-                    <div class="col-xl-6">
-                        <div class="text-center text-white">
-                            <!-- Page heading-->
-                            <h1 class="mb-5" >Manage  your  Bussiness  Finances  here  easily !!</h1>
-                            
-                            <form class="form-subscribe" id="contactForm" data-sb-form-api-token="API_TOKEN">
-                            
-                                <div class="col-auto">
-                                   <a href="{{ url_for('login') }}" class="btn btn-primary" id="submitButton">Get Started !!</a>
-                                </div>
-                               
-                                <div class="d-none" id="submitErrorMessage"><div class="text-center text-danger mb-3">Error sending message!</div></div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-        <!-- Icons Grid-->
-        <section class="features-icons bg-light text-center">
-            <div class="container">
-                <div class="row">
-                    <div class="col-lg-4">
-                        <div class="features-icons-item mx-auto mb-5 mb-lg-0 mb-lg-3">
-                            <div class="features-icons-icon d-flex"><i class="bi-window m-auto text-primary"></i></div>
-                            <h3>Fully Responsive</h3>
-                            <p class="lead mb-0">A fully responsive website will be coming soon !!</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="features-icons-item mx-auto mb-5 mb-lg-0 mb-lg-3">
-                            <div class="features-icons-icon d-flex"><i class="bi-layers m-auto text-primary"></i></div>
-                            <h3>For Bussiness</h3>
-                            <p class="lead mb-0">Speacially designed for our smalll Bussinesses!</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="features-icons-item mx-auto mb-0 mb-lg-3">
-                            <div class="features-icons-icon d-flex"><i class="bi-terminal m-auto text-primary"></i></div>
-                            <h3>Easy to Use</h3>
-                            <p class="lead mb-0">Easy to use for anyone , no rocket science needed!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <!-- Image Showcases-->
-        <section class="showcase">
-            <div class="container-fluid p-0">
-                <div class="row g-0">
-                    <div class="col-lg-6 order-lg-2 text-white showcase-img" style="background-image: url('static/img/index3.png')"></div>
-                    <div class="col-lg-6 order-lg-1 my-auto showcase-text">
-                        <h2>Fully Responsive Design</h2>
-                        <p class="lead mb-0">A fully responsive service for all devices will be available soon to make your work more easier !!</p>
-                    </div>
-                </div>
-                <div class="row g-0">
-                    <div class="col-lg-6 text-white showcase-img" style="background-image: url('static/img/index4.webp')"></div>
-                    <div class="col-lg-6 my-auto showcase-text">
-                        <h2>How Bill Up helps ?</h2>
-                        <p class="lead mb-0"> Create the Bussiness accounts on Bill  Up and manage them with our features !! </p>
-                    </div>
-                </div>
-                <div class="row g-0">
-                    <div class="col-lg-6 order-lg-2 text-white showcase-img" style="background-image: url('static/img/index5.jpg')"></div>
-                    <div class="col-lg-6 order-lg-1 my-auto showcase-text">
-                        <h2>Easy to Use </h2>
-                        <p class="lead mb-0">Bill Up is completely designed to help our small bussinessies and Local Shops of India . Lets make a change together by connecting all of them !!</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <!-- Testimonials-->
-        <section class="testimonials text-center bg-light">
-            <div class="container">
-                <h2 class="mb-5">What people are saying...</h2>
-                <div class="row">
-                    <div class="col-lg-4">
-                        <div class="testimonial-item mx-auto mb-5 mb-lg-0">
-                            <img class="img-fluid rounded-circle mb-3" src="{{ url_for('static', filename='img/undraw_profile_1.svg') }}"
-                            style="width: 40px; height: 40px; object-fit: cover;" alt="..." />
-                            <h5>Sarah M.</h5>
-                            <p class="font-weight-light mb-0">"This is fantastic! Thanks so much guys!"</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="testimonial-item mx-auto mb-5 mb-lg-0">
-                            <img class="img-fluid rounded-circle mb-3" src="{{ url_for('static', filename='img/undraw_profile_2.svg') }}"
-                            style="width: 40px; height: 40px; object-fit: cover;" alt="..." />                            
-                            <h5>Shubham M.</h5>
-                            <p class="font-weight-light mb-0">"Bill Up is amazing. I've been using it to manage bills & payments for my Bussniness."</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="testimonial-item mx-auto mb-5 mb-lg-0">
-                            <img class="img-fluid rounded-circle mb-3" src="{{ url_for('static', filename='img/undraw_profile_3.svg') }}"
-                            style="width: 40px; height: 40px; object-fit: cover;" alt="..." />
-                            <h5>Nikita W.</h5>
-                            <p class="font-weight-light mb-0">"Thanks so much for making these free resources available to us!"</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <!-- Call to Action-->
-        <section class="call-to-action text-white text-center" id="signup" style="background-image: url('{{ url_for('static', filename='img/index6.jpg') }}')">
+<body class="home">
+  {% set active_page = 'home' %}
+  {% include 'partials/public_navbar.html' %}
 
-        <!-- <section class="call-to-action text-white text-center" id="signup"> -->
-            <div class="container position-relative">
-                <div class="row justify-content-center">
-                    <div class="col-xl-6">
-                        <h2 class="mb-4">Ready to get started? Sign up now!</h2>
-                       <div class="col-auto">
-                                   <a href="{{ url_for('register') }}" class="btn btn-primary" id="submitButton">Sign Up</a>
-                        </div>
-                    </div>
-                </div>
+  <!-- ===================== Hero ===================== -->
+  <header class="home-hero">
+    <div class="container">
+      <div class="row align-items-center g-5">
+        <div class="col-lg-6">
+          <span class="home-eyebrow"><i class="fas fa-store"></i> Made for small businesses &amp; local shops</span>
+          <h1 class="home-hero-title">Keep every bill in order and <span class="text-gradient">get paid on time</span></h1>
+          <p class="home-hero-text">
+            Bill Up replaces the paper khata. Record what each customer buys, see who still owes you
+            at a glance, and let Bill Up send polite payment reminders by email for you.
+          </p>
+          <div class="home-hero-actions">
+            <a href="{{ url_for('register') }}" class="home-btn home-btn-primary">
+              Get started free <i class="fas fa-arrow-right"></i>
+            </a>
+            <a href="{{ url_for('login') }}" class="home-btn home-btn-ghost">
+              <i class="fas fa-sign-in-alt"></i> I already have an account
+            </a>
+          </div>
+          <ul class="home-hero-points">
+            <li><i class="fas fa-check-circle"></i> Free to use</li>
+            <li><i class="fas fa-check-circle"></i> Automatic email reminders</li>
+            <li><i class="fas fa-check-circle"></i> Works in any browser</li>
+          </ul>
+        </div>
+
+        <!-- App preview built from HTML, so it always matches the real app -->
+        <div class="col-lg-6">
+          <div class="home-preview" aria-hidden="true">
+            <div class="home-preview-bar">
+              <span></span><span></span><span></span>
+              <div class="home-preview-url">billup / customers</div>
             </div>
-        </section>
-        <!-- Footer-->
-        <footer class="footer bg-light">
-            <div class="container">
-                <div class="row">
-                    <div class="col-lg-6 h-100 text-center text-lg-start my-auto">
-                        <ul class="list-inline mb-2">
-                            <li class="list-inline-item"><a href="#!">About</a></li>
-                            <li class="list-inline-item">⋅</li>
-                            <li class="list-inline-item"><a href="#!">Contact</a></li>
-                            <li class="list-inline-item">⋅</li>
-                            <li class="list-inline-item"><a href="#!">Terms of Use</a></li>
-                            <li class="list-inline-item">⋅</li>
-                            <li class="list-inline-item"><a href="#!">Privacy Policy</a></li>
-                        </ul>
-                        <p class="text-muted small mb-4 mb-lg-0">&copy; Bill Up 2025. All Rights Reserved.</p>
-                    </div>
-                    <div class="col-lg-6 h-100 text-center text-lg-end my-auto">
-                        <ul class="list-inline mb-0">
-                            <li class="list-inline-item me-4">
-                                <a href="#!"><i class="bi-facebook fs-3"></i></a>
-                            </li>
-                            <li class="list-inline-item me-4">
-                                <a href="#!"><i class="bi-twitter fs-3"></i></a>
-                            </li>
-                            <li class="list-inline-item">
-                                <a href="#!"><i class="bi-instagram fs-3"></i></a>
-                            </li>
-                        </ul>
-                    </div>
+            <div class="home-preview-body">
+              <div class="home-preview-stats">
+                <div class="home-preview-stat">
+                  <div class="home-preview-icon red"><i class="fas fa-rupee-sign"></i></div>
+                  <div>
+                    <div class="home-preview-label">Total outstanding</div>
+                    <div class="home-preview-value">₹ 16,800</div>
+                  </div>
                 </div>
+                <div class="home-preview-stat">
+                  <div class="home-preview-icon blue"><i class="fas fa-users"></i></div>
+                  <div>
+                    <div class="home-preview-label">Customers</div>
+                    <div class="home-preview-value">24</div>
+                  </div>
+                </div>
+              </div>
+              <div class="home-preview-table">
+                <div class="home-preview-row head">
+                  <span>Customer</span><span>Status</span><span class="text-end">Amount due</span>
+                </div>
+                <div class="home-preview-row">
+                  <span class="who"><b>R</b>Ravi Kumar</span>
+                  <span><em class="pill pending">Pending</em></span>
+                  <span class="text-end amt">₹ 12,500</span>
+                </div>
+                <div class="home-preview-row">
+                  <span class="who"><b>A</b>Anita Desai</span>
+                  <span><em class="pill done">Done</em></span>
+                  <span class="text-end amt">₹ 0</span>
+                </div>
+                <div class="home-preview-row">
+                  <span class="who"><b>M</b>Mohit Jain</span>
+                  <span><em class="pill pending">Pending</em></span>
+                  <span class="text-end amt">₹ 4,300</span>
+                </div>
+              </div>
             </div>
-        </footer>
-        <!-- Bootstrap core JS-->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
-        <!-- Core theme JS-->
-        <script src="js/scripts.js"></script>
-        
-        <script src="https://cdn.startbootstrap.com/sb-forms-latest.js"></script>
-    </body>
+            <div class="home-preview-toast">
+              <i class="fas fa-bell"></i>
+              <div>
+                <strong>Reminder scheduled</strong>
+                <span>Ravi will be emailed on the due date</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== Audience strip ===================== -->
+  <section class="home-strip">
+    <div class="container">
+      <p>Built for the businesses that run on trust and credit</p>
+      <ul>
+        <li><i class="fas fa-shopping-basket"></i> Kirana stores</li>
+        <li><i class="fas fa-pills"></i> Medical shops</li>
+        <li><i class="fas fa-tools"></i> Hardware stores</li>
+        <li><i class="fas fa-tshirt"></i> Clothing shops</li>
+        <li><i class="fas fa-truck"></i> Wholesalers</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== Features ===================== -->
+  <section class="home-section" id="features">
+    <div class="container">
+      <div class="home-section-head">
+        <span class="home-eyebrow">Features</span>
+        <h2>Everything you need to manage customer credit</h2>
+        <p>Simple tools that save you time every day, with no accounting knowledge needed.</p>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon blue"><i class="fas fa-address-book"></i></div>
+            <h3>Customer accounts</h3>
+            <p>Keep every customer's name, phone number and email in one place, and open their full history with one click.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon green"><i class="fas fa-receipt"></i></div>
+            <h3>Bill entries</h3>
+            <p>Record each purchase with the items, notes, amount and due date. Edit or remove entries any time.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon red"><i class="fas fa-rupee-sign"></i></div>
+            <h3>Pending payments at a glance</h3>
+            <p>See your total outstanding amount and which customers still owe you, with clear Pending and Done labels.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon amber"><i class="fas fa-bell"></i></div>
+            <h3>Automatic email reminders</h3>
+            <p>Email a customer right away, or schedule a reminder that goes out at midnight on the due date.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon purple"><i class="fas fa-search"></i></div>
+            <h3>Search &amp; sort</h3>
+            <p>Find any customer or bill in seconds. Sort by name, amount, purchase date or due date.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <div class="home-feature">
+            <div class="home-feature-icon teal"><i class="fas fa-lock"></i></div>
+            <h3>Private &amp; secure</h3>
+            <p>Your data is protected by your own login, and passwords are stored securely hashed, never in plain text.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== How it works ===================== -->
+  <section class="home-section home-section-alt" id="about">
+    <div class="container">
+      <div class="home-section-head">
+        <span class="home-eyebrow">How it works</span>
+        <h2>Up and running in three simple steps</h2>
+        <p>Bill Up is designed to help the small businesses and local shops of India go digital, without the hassle.</p>
+      </div>
+
+      <div class="row g-4 home-steps">
+        <div class="col-md-4">
+          <div class="home-step">
+            <div class="home-step-num">1</div>
+            <h3>Create your account</h3>
+            <p>Sign up with your business name and details. It takes less than a minute.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="home-step">
+            <div class="home-step-num">2</div>
+            <h3>Add your customers</h3>
+            <p>Add the people you give credit to, with their phone number and email.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="home-step">
+            <div class="home-step-num">3</div>
+            <h3>Record bills, get paid</h3>
+            <p>Add each purchase and let Bill Up remind your customers when payment is due.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Reminders showcase ===================== -->
+  <section class="home-section">
+    <div class="container">
+      <div class="row align-items-center g-5">
+        <div class="col-lg-6 order-lg-2">
+          <span class="home-eyebrow">Payment reminders</span>
+          <h2 class="home-split-title">Stop chasing payments. Let Bill Up remind them.</h2>
+          <p class="home-split-text">Asking customers for money is uncomfortable. Bill Up sends a friendly, professional email with every detail of the purchase, so your customers know exactly what they owe.</p>
+          <ul class="home-checklist">
+            <li><i class="fas fa-paper-plane"></i><div><strong>Email now</strong><span>Send a reminder to the customer instantly.</span></div></li>
+            <li><i class="fas fa-calendar-check"></i><div><strong>On the due date</strong><span>Scheduled for 12:00 AM on the day payment is due.</span></div></li>
+            <li><i class="fas fa-user"></i><div><strong>Remind me</strong><span>Get an email yourself, so you can follow up in person.</span></div></li>
+          </ul>
+        </div>
+        <div class="col-lg-6 order-lg-1">
+          <div class="home-email" aria-hidden="true">
+            <div class="home-email-head">
+              <div class="home-email-from"><b>S</b><div><strong>Sharma Traders</strong><span>Payment reminder</span></div></div>
+              <span class="home-email-time">12:00 AM</span>
+            </div>
+            <div class="home-email-banner">
+              <span>Payment reminder</span>
+              <strong>₹ 12,500</strong>
+              <em>Due on 30-10-26</em>
+            </div>
+            <div class="home-email-body">
+              <p>Dear Ravi Kumar,</p>
+              <p>This is a gentle reminder from <b>Sharma Traders</b> about a pending payment.</p>
+              <div class="home-email-rows">
+                <div><span>Items</span><b>Rice 5kg, Oil 1L, Sugar 2kg</b></div>
+                <div><span>Purchase date</span><b>01-10-26</b></div>
+                <div><span>Amount due</span><b class="due">₹ 12,500</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Testimonials ===================== -->
+  <section class="home-section home-section-alt" id="testimonials">
+    <div class="container">
+      <div class="home-section-head">
+        <span class="home-eyebrow">Testimonials</span>
+        <h2>What people are saying</h2>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <figure class="home-quote">
+            <div class="home-stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+            <blockquote>"This is fantastic! Thanks so much guys!"</blockquote>
+            <figcaption>
+              <img src="{{ url_for('static', filename='img/undraw_profile_1.svg') }}" alt="">
+              <div><strong>Sarah M.</strong><span>Shop owner</span></div>
+            </figcaption>
+          </figure>
+        </div>
+        <div class="col-md-4">
+          <figure class="home-quote">
+            <div class="home-stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+            <blockquote>"Bill Up is amazing. I've been using it to manage bills &amp; payments for my business."</blockquote>
+            <figcaption>
+              <img src="{{ url_for('static', filename='img/undraw_profile_2.svg') }}" alt="">
+              <div><strong>Shubham M.</strong><span>Business owner</span></div>
+            </figcaption>
+          </figure>
+        </div>
+        <div class="col-md-4">
+          <figure class="home-quote">
+            <div class="home-stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+            <blockquote>"Thanks so much for making these free resources available to us!"</blockquote>
+            <figcaption>
+              <img src="{{ url_for('static', filename='img/undraw_profile_3.svg') }}" alt="">
+              <div><strong>Nikita W.</strong><span>Shop owner</span></div>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Call to action ===================== -->
+  <section class="home-cta" id="signup">
+    <div class="container">
+      <div class="home-cta-box">
+        <div>
+          <h2>Ready to get paid on time?</h2>
+          <p>Create your free Bill Up account and add your first customer in minutes.</p>
+        </div>
+        <div class="home-cta-actions">
+          <a href="{{ url_for('register') }}" class="home-btn home-btn-white">Create free account <i class="fas fa-arrow-right"></i></a>
+          <a href="{{ url_for('login') }}" class="home-btn home-btn-outline-white">Log in</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% include 'partials/public_footer.html' %}
+</body>
 </html>
