@@ -66,8 +66,12 @@ app = Flask(__name__)
 app.secret_key = require_env("SECRET_KEY")  # Signs the session cookie
 logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO)
 database_url = require_env("DATABASE_URL")
-if database_url.startswith("postgres://"):  # Some hosts hand out the old spelling; SQLAlchemy needs postgresql://
-    database_url = "postgresql://" + database_url[len("postgres://"):]
+# Use the psycopg2 driver from requirements.txt (SQLAlchemy 2.1 would otherwise
+# look for psycopg 3). Also accepts the old postgres:// spelling some hosts use.
+for prefix in ("postgres://", "postgresql://"):
+    if database_url.startswith(prefix):
+        database_url = "postgresql+psycopg2://" + database_url[len(prefix):]
+        break
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 # Hosted databases (e.g. Neon) pause when idle and drop open connections, so
 # check each pooled connection before use and replace old ones.
