@@ -31,11 +31,25 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, date
 import atexit
 from google.cloud import translate_v2 as translate
+from dotenv import load_dotenv
+
+# Passwords and keys live in a .env file next to this script (never committed).
+# See .env.example for the list of settings.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
+
+def require_env(name):
+    """Read a required setting from the environment, failing fast if it is missing."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing setting {name}. Add it to the .env file (see .env.example).")
+    return value
+
 
 app = Flask(__name__)
-app.secret_key = 'super-secret-key'  # Add a secret key for session handling if needed
+app.secret_key = require_env("SECRET_KEY")  # Signs the session cookie
 logging.basicConfig(level=logging.DEBUG)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:Djain1234@localhost/Bill Up'
+app.config['SQLALCHEMY_DATABASE_URI'] = require_env("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -896,9 +910,6 @@ def send_mail():
     items_details = data.get("items_details")
     total = data.get("total")
 
-    # Email credentials (set email credentials here)
-    sender_email = "divyanhjain@gmail.com"  
-    sender_password = "uwwn evdk xjxn zlag"  
     subject = "Bill Up Notification"
     body = f"Dear {customer_name},\n\nA Gentle Remainder from {b_name} !!\n\n " \
            f"You have pending payment of Rupees {total} of items purchased on Date : {purchase_date}\n\n " \
@@ -941,8 +952,8 @@ def send_mail():
 # Scheduled reminders are stored in the entry_reminders table and removed once
 # the email has been sent successfully (or when the user clears them).
 # ---------------------------------------------------------------------------
-sender_email = "divyanhjain@gmail.com"
-sender_password = "uwwn evdk xjxn zlag"
+sender_email = require_env("MAIL_USERNAME")
+sender_password = require_env("MAIL_PASSWORD")  # Gmail app password
 
 REMINDER_RECIPIENTS = ("customer", "owner")
 
@@ -1184,8 +1195,8 @@ scheduler.add_job(func=send_due_reminders, trigger="cron", minute=0,
 # ---------------------------------------------------------------------------
 # Admin
 # ---------------------------------------------------------------------------
-ADMIN_USERNAME = "Djain"
-ADMIN_PASSWORD = "25102004"
+ADMIN_USERNAME = require_env("ADMIN_USERNAME")
+ADMIN_PASSWORD = require_env("ADMIN_PASSWORD")
 
 
 def admin_required(view):
@@ -1382,7 +1393,7 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
 
-    debug = True
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
     # With debug=True the reloader runs this file twice (a watcher process and the
     # real server). Start the scheduler only in the server process, otherwise
     # every reminder email would be sent twice.
