@@ -13,6 +13,8 @@
     <!-- Shared look with the customer pages (navbar, cards, table, modal, confirm dialog) -->
     <link href="{{ url_for('static', filename='css/customer.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/admin.css') }}" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
 </head>
 <body>
 

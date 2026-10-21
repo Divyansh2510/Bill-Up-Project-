@@ -154,17 +154,18 @@
               {% endif %}
 
               <form action="{{ url_for('AdminLog') }}" method="POST" id="adminForm">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Admin ID -->
                 <div class="form-outline mb-3">
                   <input type="text" id="adminUserId" name="UserID" class="form-control form-control-lg"
-                    autocomplete="username" autocapitalize="off" spellcheck="false" required />
+                    maxlength="{{ ADMIN_FIELD_MAX }}" autocomplete="username" autocapitalize="off" spellcheck="false" required />
                   <label class="form-label" for="adminUserId">Admin ID</label>
                 </div>
 
                 <!-- Password with show / hide -->
                 <div class="form-outline mb-2 position-relative">
                   <input type="password" id="adminPassword" name="Password" class="form-control form-control-lg password-input"
-                    autocomplete="current-password" required />
+                    maxlength="{{ ADMIN_FIELD_MAX }}" autocomplete="current-password" required />
                   <label class="form-label" for="adminPassword">Password</label>
                   <i class="fas fa-eye toggle-password" id="togglePassword" title="Show password"></i>
                 </div>

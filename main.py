@@ -9,16 +9,16 @@ from datetime import datetime
 import logging
 from flask_mail import Mail
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import generate_password_hash,check_password_hash
 import json
 from functools import wraps
 import re
-import pymysql
 import os
 import math
 from sqlalchemy import select
 from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from wtforms import StringField, TextAreaField, DateField, IntegerField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_
@@ -32,6 +32,10 @@ from datetime import datetime, date
 import atexit
 from google.cloud import translate_v2 as translate
 from dotenv import load_dotenv
+from werkzeug.middleware.proxy_fix import ProxyFix
+import hmac
+import threading
+import time
 
 # Passwords and keys live in a .env file next to this script (never committed).
 # See .env.example for the list of settings.
@@ -46,12 +50,45 @@ def require_env(name):
     return value
 
 
+def env_flag(name, default=False):
+    """Read a true/false setting from the environment."""
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+DEBUG = env_flag("FLASK_DEBUG")  # Keep false on the live server
+
 app = Flask(__name__)
 app.secret_key = require_env("SECRET_KEY")  # Signs the session cookie
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = require_env("DATABASE_URL")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,     # JavaScript cannot read the login cookie
+    SESSION_COOKIE_SAMESITE="Lax",    # Other sites cannot send it along with their requests
+    SESSION_COOKIE_SECURE=env_flag("SESSION_COOKIE_SECURE"),  # true once the site runs on HTTPS
+    WTF_CSRF_TIME_LIMIT=None,         # A CSRF token stays valid for the whole login session
+)
+
+# Every POST must carry the CSRF token: forms send it as a hidden field and
+# fetch() calls send it as the X-CSRFToken header (see static/js/csrf.js).
+csrf = CSRFProtect(app)
+
+# Behind a hosting proxy (Render, Railway, Nginx...) this makes request.remote_addr
+# the visitor's real IP, which the login limit below relies on.
+if env_flag("TRUST_PROXY"):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+
+def reflect_existing(metadata, *table_names):
+    """Load just the named tables that exist into metadata (not every table in the database)."""
+    inspector = db.inspect(db.engine)
+    existing = [name for name in table_names if inspector.has_table(name)]
+    if existing:
+        metadata.reflect(bind=db.engine, only=existing, extend_existing=True)
 
 NOTES_MAX_LENGTH = 200  # Maximum characters allowed in an entry's notes
 app.jinja_env.globals["NOTES_MAX_LENGTH"] = NOTES_MAX_LENGTH  # Same limit in the templates
@@ -83,9 +120,70 @@ class EntryReminder(db.Model):
     last_attempt = db.Column(db.DateTime, nullable=True)
     last_error = db.Column(db.Text, nullable=True)
 
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    """A form or request arrived without a valid CSRF token (e.g. the page was open too long)."""
+    message = "Your session has expired. Please refresh the page and try again."
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"error": message}), 400
+    flash(message, "error")
+    return redirect(request.referrer or url_for("index"))
+
+
+# ---------------------------------------------------------------------------
+# Login limit
+#
+# After LOGIN_MAX_FAILURES wrong passwords for the same user ID from the same IP
+# address, that pair is locked for LOGIN_LOCK_SECONDS. Kept in memory, so it
+# resets when the server restarts (the app runs as a single process).
+# ---------------------------------------------------------------------------
+LOGIN_MAX_FAILURES = 5
+LOGIN_LOCK_SECONDS = 15 * 60
+_login_failures = {}  # (scope, ip, user id) -> {"count", "first", "locked_until"}
+_login_failures_lock = threading.Lock()
+
+
+def _login_key(scope, user_id):
+    return (scope, request.remote_addr or "unknown", user_id.lower())
+
+
+def login_locked_minutes(scope, user_id):
+    """Minutes left before this IP may try this user ID again (0 = not locked)."""
+    with _login_failures_lock:
+        info = _login_failures.get(_login_key(scope, user_id))
+        remaining = info["locked_until"] - time.time() if info else 0
+    return math.ceil(remaining / 60) if remaining > 0 else 0
+
+
+def record_login_failure(scope, user_id):
+    now = time.time()
+    with _login_failures_lock:
+        if len(_login_failures) > 10000:  # Forget stale entries so the dict cannot grow forever
+            for key in [k for k, v in _login_failures.items()
+                        if now - v["first"] > LOGIN_LOCK_SECONDS and v["locked_until"] < now]:
+                del _login_failures[key]
+        key = _login_key(scope, user_id)
+        info = _login_failures.get(key)
+        if not info or now - info["first"] > LOGIN_LOCK_SECONDS:
+            info = {"count": 0, "first": now, "locked_until": 0}
+        info["count"] += 1
+        if info["count"] >= LOGIN_MAX_FAILURES:
+            info["locked_until"] = now + LOGIN_LOCK_SECONDS
+        _login_failures[key] = info
+
+
+def clear_login_failures(scope, user_id):
+    with _login_failures_lock:
+        _login_failures.pop(_login_key(scope, user_id), None)
+
+
+def too_many_attempts_message(minutes):
+    return f"Too many failed attempts. Please try again in {minutes} minute{'s' if minutes != 1 else ''}."
+
+
 @app.route("/")
 def index():
-    
+
     return render_template("index.html")
 
 @app.route("/login", methods=["GET", "POST"])
@@ -98,23 +196,43 @@ def login():
         # Check for empty fields
         if not user_id or not password:
             return render_template(
-                "login.html", 
+                "login.html",
                 error_message="Please fill in all fields.",
                 user_id=user_id  # Preserve the entered UserID
             )
+
+        # Longer than registration allows can never be a real account; skip the database
+        if (len(user_id) > REGISTRATION_RULES["UserID"]["max"]
+                or len(password) > REGISTRATION_RULES["Password"]["max"]):
+            return render_template(
+                "login.html",
+                error_message="Wrong password or username entered. Please try again.",
+                user_id=user_id[:REGISTRATION_RULES["UserID"]["max"]]
+            )
+
+        locked_minutes = login_locked_minutes("user", user_id)
+        if locked_minutes:
+            return render_template(
+                "login.html",
+                error_message=too_many_attempts_message(locked_minutes),
+                user_id=user_id
+            ), 429
 
         # Query user from the database
         user = Registration.query.filter_by(UserID=user_id).first()
 
         # Validate user credentials
-        if user and check_password_hash(user.Password, password): 
+        if user and check_password_hash(user.Password, password):
+            clear_login_failures("user", user_id)
+            session.clear()  # Start a fresh session on login
             session["user_id"] = user.UserID  # Save user info in the session
             session["b_name"] = user.bName
-            return redirect(url_for("customer"))  
+            return redirect(url_for("customer"))
 
         # Invalid credentials
+        record_login_failure("user", user_id)
         return render_template(
-            "login.html", 
+            "login.html",
             error_message="Wrong password or username entered. Please try again.",
             user_id=user_id  # Preserve the entered UserID
         )
@@ -124,8 +242,8 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.clear()  
-    return redirect(url_for('index'))  
+    session.clear()
+    return redirect(url_for('index'))
 
 
 # ---------------------------------------------------------------------------
@@ -288,14 +406,13 @@ def customer():
 
     try:
         # Reflect the specific table
-        metadata.reflect(bind=db.engine, only=[table_name])
+        reflect_existing(metadata, table_name)
 
-        if table_name not in metadata.tables:
-            print(f"Table {table_name} does not exist.")
+        if table_name not in metadata.tables:  # New business with no customers yet
             return render_template(
-                "customer.html", 
-                user_id=user_id, 
-                customers=[], 
+                "customer.html",
+                user_id=user_id,
+                customers=[],
                 overall_total_sum=0,
                 b_name=b_name,
             )
@@ -307,9 +424,9 @@ def customer():
             query = customer_table.select()
 
             if search_query:
-                # Add a filter to the query for the search functionality
+                # Add a filter to the query for the search functionality (% and _ are matched literally)
                 query = query.where(
-                    db.func.lower(customer_table.c.name).like(f"%{search_query}%")
+                    db.func.lower(customer_table.c.name).contains(search_query, autoescape=True)
                 )
 
             result = connection.execute(query)
@@ -319,10 +436,10 @@ def customer():
             customers = [dict(zip(column_names, row)) for row in result]
 
         # Calculate overall_total for each customer and the total sum
+        reflect_existing(metadata, *(f"{user_id}_{c['name'].lower()}" for c in customers))
         for customer in customers:
             customer_name = customer["name"]
             entries_table_name = f"{user_id}_{customer_name.lower()}"
-            metadata.reflect(bind=db.engine)
 
             if entries_table_name in metadata.tables:
                 entries_table = metadata.tables[entries_table_name]
@@ -335,15 +452,15 @@ def customer():
                 customer["overall_total"] = 0  # Default to 0 if no entries table exists
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        app.logger.error(f"Error while loading customers: {e}")
         customers = []  # Default to empty if an error occurs
 
     # Pass the filtered results to the template
     return render_template(
-        "customer.html", 
-        user_id=user_id, 
-        customers=customers, 
-        overall_total_sum=overall_total_sum, 
+        "customer.html",
+        user_id=user_id,
+        customers=customers,
+        overall_total_sum=overall_total_sum,
         b_name=b_name,
     )
 
@@ -400,19 +517,74 @@ def customer():
 #     return render_template("customer.html", user_id=user_id, customers=customers, overall_total_sum=overall_total_sum, b_name=b_name)
 
 
+# ---------------------------------------------------------------------------
+# Customer details
+#
+# Each customer's entries live in a table named "<user id>_<customer name>".
+# PostgreSQL cuts table names at 63 characters, so names are kept short enough
+# that two customers can never end up sharing a table, and limited to plain
+# characters that are safe in table names and URLs.
+# ---------------------------------------------------------------------------
+CUSTOMER_NAME_MAX = 40
+CUSTOMER_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 .&'\-]*$"
+CUSTOMER_EMAIL_MAX = 100
+CUSTOMER_CONTACT_PATTERN = r"^[0-9]{10}$"
+assert REGISTRATION_RULES["UserID"]["max"] + 1 + CUSTOMER_NAME_MAX <= 63, "Entries table names would be too long"
+app.jinja_env.globals.update(
+    CUSTOMER_NAME_MAX=CUSTOMER_NAME_MAX,
+    CUSTOMER_NAME_PATTERN=CUSTOMER_NAME_PATTERN,
+)
+
+
+def clean_customer_name(name):
+    """Trim the name and collapse repeated spaces."""
+    return " ".join((name or "").split())
+
+
+def validate_customer_name(name):
+    """Return an error message for an invalid customer name, or None."""
+    if not name:
+        return "Customer name is required."
+    if len(name) > CUSTOMER_NAME_MAX:
+        return f"Customer name cannot be longer than {CUSTOMER_NAME_MAX} characters."
+    if not re.fullmatch(CUSTOMER_NAME_PATTERN, name):
+        return "Customer name must start with a letter or number and can only contain letters, numbers, spaces and . & ' -"
+    return None
+
+
+def validate_customer_contact_details(email, contact):
+    """Return an error message for an invalid email or contact number, or None. Both are optional."""
+    if email and (len(email) > CUSTOMER_EMAIL_MAX
+                  or not re.fullmatch(REGISTRATION_RULES["Email"]["pattern"], email)):
+        return "Please enter a valid email address."
+    if contact and not re.fullmatch(CUSTOMER_CONTACT_PATTERN, contact):
+        return "Contact number must be exactly 10 digits."
+    return None
+
+
+def customer_exists(user_id, customer_name):
+    table_name = f"{user_id.lower()}_customers"
+    return db.inspect(db.engine).has_table(table_name) and get_customer_record(user_id, customer_name) is not None
+
+
 @app.route("/add_customer", methods=["POST"])
 def add_customer():
     if 'user_id' in session:  # Ensure the user is logged in
         user_id = session['user_id']
-        customer_name = request.form['customer_name']
-        customer_email = request.form['customer_email']
-        customer_contact = request.form['customer_contact']
+        customer_name = clean_customer_name(request.form.get('customer_name'))
+        customer_email = request.form.get('customer_email', '').strip()
+        customer_contact = request.form.get('customer_contact', '').strip()
+
+        error = validate_customer_name(customer_name) or validate_customer_contact_details(customer_email, customer_contact)
+        if error:
+            flash(error, "error")
+            return redirect(url_for("customer"))
 
         # Standardize table name
         table_name = f"{user_id.lower()}_customers"  # Lowercase for consistency
 
         # Dynamic table creation
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+        engine = db.engine
         metadata = MetaData()
 
         try:
@@ -429,6 +601,12 @@ def add_customer():
 
             # Insert data into the new table
             with engine.connect() as connection:
+                # "Ravi" and "ravi" would share one entries table, so names are unique ignoring case
+                duplicate = connection.execute(
+                    select(customer_table.c.id).where(db.func.lower(customer_table.c.name) == customer_name.lower())
+                ).first()
+                if duplicate:
+                    raise IntegrityError(None, None, Exception("duplicate customer name"))
                 insert_query = customer_table.insert().values(
                     name=customer_name,
                     email=customer_email,
@@ -445,7 +623,8 @@ def add_customer():
             return redirect(url_for("customer"))
 
         except Exception as e:
-            flash(f"Unexpected Error: {str(e)}", "error")  # Toast notification
+            app.logger.error(f"Error while adding customer: {e}")
+            flash("Something went wrong while adding the customer. Please try again.", "error")  # Toast notification
             return redirect(url_for("customer"))
 
     flash("Unauthorized access. Please log in.", "error")
@@ -483,7 +662,7 @@ def account(customer_name):
         customer = dict(result._mapping)
 
         # Check if the dynamic table exists
-        metadata.reflect(bind=db.engine)
+        reflect_existing(metadata, entries_table_name)
         if entries_table_name in metadata.tables:
             entries_table = metadata.tables[entries_table_name]
             with db.engine.connect() as connection:
@@ -538,6 +717,11 @@ def add_entry(customer_name):
     user_id = session["user_id"]
     table_name = f"{user_id}_{customer_name.lower()}"  # Table name pattern: user_customer
 
+    # Only create entries for an existing customer (the name comes from the URL)
+    if not customer_exists(user_id, customer_name):
+        flash("Customer not found.", "error")
+        return redirect(url_for("customer"))
+
     # Collect form data
     purchase_date = request.form.get("pdate")
     notes = request.form.get("notes")
@@ -557,7 +741,7 @@ def add_entry(customer_name):
         return redirect(url_for("account", customer_name=customer_name))
 
     metadata = MetaData()
-    engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
+    engine = db.engine
 
     try:
         # Define the customer-specific table
@@ -675,7 +859,7 @@ def delete_entry(customer_name, entry_id):
     table_name = f"{user_id}_{customer_name.lower()}"
 
     metadata = MetaData()
-    engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
+    engine = db.engine
 
     try:
         # Reflect the dynamic table
@@ -714,8 +898,7 @@ def delete_customer(customer_id):
 
     try:
         # Reflect metadata to ensure table exists
-        metadata.reflect(bind=db.engine)
-        app.logger.debug(f"Available tables: {metadata.tables.keys()}")
+        reflect_existing(metadata, customer_table_name)
 
         # Check if the customer table exists
         if customer_table_name not in metadata.tables:
@@ -737,6 +920,7 @@ def delete_customer(customer_id):
 
         customer_name = customer["name"]
         dynamic_table_name = f"{user_id}_{customer_name.lower()}"
+        reflect_existing(metadata, dynamic_table_name)
 
         # Drop the dynamic table if it exists
         app.logger.debug(f"Checking for dynamic table: {dynamic_table_name}")
@@ -762,7 +946,7 @@ def delete_customer(customer_id):
 
     except Exception as e:
         app.logger.error(f"Error while deleting customer: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Something went wrong while deleting the customer."}), 500
 
 
 @app.route("/update_customer/<customer_name>", methods=["POST"])
@@ -772,7 +956,13 @@ def update_customer(customer_name):
 
     user_id = session["user_id"]
     table_name = f"{user_id.lower()}_customers"
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip()
+    contact = str(data.get("contact") or "").strip()
+
+    error = validate_customer_contact_details(email, contact)
+    if error:
+        return jsonify({"error": error}), 400
 
     metadata = MetaData()
     try:
@@ -785,8 +975,8 @@ def update_customer(customer_name):
             update_query = customer_table.update().where(
                 customer_table.c.name == customer_name
             ).values(
-                contact=data["contact"],
-                email=data["email"]
+                contact=contact,
+                email=email
             )
             connection.execute(update_query)
             connection.commit()  # Commit transaction
@@ -796,7 +986,7 @@ def update_customer(customer_name):
     except Exception as e:
         app.logger.error(f"Error while updating customer: {e}")
         return jsonify({"error": "An error occurred while updating"}), 500
-    
+
 
 @app.route("/get_entry/<customer_name>/<int:entry_id>", methods=["GET"])
 def get_entry(customer_name, entry_id):
@@ -807,7 +997,7 @@ def get_entry(customer_name, entry_id):
     table_name = f"{user_id}_{customer_name.lower()}"
 
     metadata = MetaData()
-    engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
+    engine = db.engine
 
     try:
         customer_table = Table(table_name, metadata, autoload_with=engine)
@@ -865,7 +1055,7 @@ def update_entry(customer_name):
         return jsonify({"error": "Invalid entry_id"}), 400
 
     metadata = MetaData()
-    engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
+    engine = db.engine
     table_name = f"{user_id}_{customer_name.lower()}"
 
     try:
@@ -897,51 +1087,7 @@ def update_entry(customer_name):
         app.logger.error(f"Error occurred: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
-#sending mail 
-@app.route("/send_mail", methods=["POST"])
-def send_mail():
-    # Parse the request data
-    data = request.get_json()
-    customer_email = data.get("email")
-    customer_name = data.get("name")
-    b_name = data.get("b_name")
-    overall_total = data.get("overall_total")
-    purchase_date = data.get("purchase_date")
-    items_details = data.get("items_details")
-    total = data.get("total")
-
-    subject = "Bill Up Notification"
-    body = f"Dear {customer_name},\n\nA Gentle Remainder from {b_name} !!\n\n " \
-           f"You have pending payment of Rupees {total} of items purchased on Date : {purchase_date}\n\n " \
-           f"The items are : {items_details}\n\n" \
-           f"Payable Total:{total}\n\n" \
-           f"Also Your Sum of all Previous Pending Purchases still left are : {overall_total}\n\n " \
-           f"Keep Shopping with us . Thank You !!\n\n" \
-           f"Best regards,\nBill Up Team"
-
-    try:
-        # Set up the email server and login
-        server = smtplib.SMTP("smtp.gmail.com", 587)  
-        server.starttls()  # Upgrade the connection to secure
-        server.login(sender_email, sender_password)
-
-        # Create the email message
-        msg = MIMEMultipart()
-        msg["From"] = sender_email
-        msg["To"] = customer_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-
-        # Send the email
-        server.sendmail(sender_email, customer_email, msg.as_string())
-        server.quit()
-
-        return jsonify({"message": "Email sent successfully"})
-    
-    except Exception as e:
-        app.logger.error(f"Error occurred: {e}")
-        return jsonify({"error": "Unexpected error occurred"}), 500
-    
+#sending mail
 # ---------------------------------------------------------------------------
 # Payment reminders
 #
@@ -1197,6 +1343,9 @@ scheduler.add_job(func=send_due_reminders, trigger="cron", minute=0,
 # ---------------------------------------------------------------------------
 ADMIN_USERNAME = require_env("ADMIN_USERNAME")
 ADMIN_PASSWORD = require_env("ADMIN_PASSWORD")
+ADMIN_FIELD_MAX = 128  # Longest admin ID / password the login form accepts
+assert len(ADMIN_USERNAME) <= ADMIN_FIELD_MAX and len(ADMIN_PASSWORD) <= ADMIN_FIELD_MAX
+app.jinja_env.globals["ADMIN_FIELD_MAX"] = ADMIN_FIELD_MAX
 
 
 def admin_required(view):
@@ -1217,14 +1366,22 @@ def AdminLog():
         return redirect(url_for("AdminDash"))
 
     if request.method == "POST":
-        user_id = request.form.get("UserID", "").strip()
-        password = request.form.get("Password", "")
+        user_id = request.form.get("UserID", "").strip()[:ADMIN_FIELD_MAX]
+        password = request.form.get("Password", "")[:ADMIN_FIELD_MAX + 1]  # One extra so an over-long password fails
 
-        if user_id == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        locked_minutes = login_locked_minutes("admin", user_id)
+        if locked_minutes:
+            return render_template("AdminLog.html", alert_message=too_many_attempts_message(locked_minutes)), 429
+
+        # compare_digest takes the same time whether or not the first characters match
+        if (hmac.compare_digest(user_id.encode(), ADMIN_USERNAME.encode())
+                and hmac.compare_digest(password.encode(), ADMIN_PASSWORD.encode())):
+            clear_login_failures("admin", user_id)
             session["is_admin"] = True
             session["admin_id"] = user_id
             return redirect(url_for("AdminDash"))
 
+        record_login_failure("admin", user_id)
         return render_template(
             "AdminLog.html",
             alert_message="Invalid UserID or Password. Please try again."
@@ -1385,7 +1542,9 @@ def About():
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    logging.error(f"Error occurred: {e}")
+    if isinstance(e, HTTPException):  # 404, 405... keep their own status
+        return e
+    app.logger.exception(f"Error occurred: {e}")
     return "An unexpected error occurred. Please try again.", 500
 
 
@@ -1393,12 +1552,23 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
 
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
-    # With debug=True the reloader runs this file twice (a watcher process and the
-    # real server). Start the scheduler only in the server process, otherwise
-    # every reminder email would be sent twice.
-    if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        scheduler.start()
-        atexit.register(lambda: scheduler.shutdown())  # Graceful shutdown on exit
+    if DEBUG:
+        # Development: Flask's auto-reloading server. With debug on, the reloader
+        # runs this file twice (a watcher process and the real server); start the
+        # scheduler only in the server process, otherwise every reminder email
+        # would be sent twice.
+        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+            scheduler.start()
+            atexit.register(lambda: scheduler.shutdown())  # Graceful shutdown on exit
+        app.run(debug=True)
+    else:
+        # Live: Waitress, a production server. It runs a single process (with
+        # several threads), so the reminder scheduler runs exactly once.
+        from waitress import serve
 
-    app.run(debug=debug)
+        scheduler.start()
+        atexit.register(lambda: scheduler.shutdown())
+        host = os.environ.get("HOST", "0.0.0.0")
+        port = int(os.environ.get("PORT", "5000"))
+        app.logger.info(f"Bill Up running on http://{host}:{port}")
+        serve(app, host=host, port=port, threads=8)

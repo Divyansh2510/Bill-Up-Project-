@@ -12,6 +12,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/customer.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/account.css') }}" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
 </head>
 
 <body>
@@ -224,6 +226,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="addNewForm" method="POST" action="{{ url_for('add_entry', customer_name=customer_name) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-sm-6">
@@ -374,7 +377,7 @@
                         </div>
                         <div>
                             <label for="editEmail" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="editEmail" name="email"
+                            <input type="email" class="form-control" id="editEmail" name="email" maxlength="100"
                                 value="{{ customer_email or '' }}" placeholder="name@example.com">
                         </div>
                     </div>
@@ -548,7 +551,8 @@
                     if (response.ok) {
                         reloadWithToast('Customer details updated.');
                     } else {
-                        showToast('Failed to update customer details.', false);
+                        const result = await response.json().catch(() => ({}));
+                        showToast(result.error || 'Failed to update customer details.', false);
                     }
                 } catch (error) {
                     console.error('Error:', error);

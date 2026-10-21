@@ -154,6 +154,7 @@
               {% set R = REGISTRATION_RULES %}
               {% set errs = field_errors or {} %}
               <form action="{{ url_for('register') }}" method="POST" id="registerForm" class="register-form" novalidate>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                   <!-- Business name / type -->
                   <div class="col-sm-7">
