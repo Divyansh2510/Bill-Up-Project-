@@ -1,0 +1,40 @@
+# Render Blueprint: New -> Blueprint -> pick this repo. Render asks for the
+# values marked "sync: false" and generates the random keys itself.
+services:
+  - type: web
+    name: bill-up
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.11
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: RUN_SCHEDULER
+        value: "false"
+      - key: TZ
+        value: Asia/Kolkata
+      - key: MAIL_SENDER_NAME
+        value: Bill Up
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

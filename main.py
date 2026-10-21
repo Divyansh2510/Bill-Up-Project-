@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request,session,redirect,url_for,jsonify
+from flask import Flask, render_template, request,session,redirect,url_for,jsonify,abort
 from sqlalchemy import Table, Column, Integer, String, MetaData,Float, Date, Text, JSON
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from sqlalchemy.dialects.postgresql import JSON
@@ -36,6 +36,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import hmac
 import threading
 import time
+import urllib.request
+import urllib.error
 
 # Passwords and keys live in a .env file next to this script (never committed).
 # See .env.example for the list of settings.
@@ -63,7 +65,13 @@ DEBUG = env_flag("FLASK_DEBUG")  # Keep false on the live server
 app = Flask(__name__)
 app.secret_key = require_env("SECRET_KEY")  # Signs the session cookie
 logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO)
-app.config['SQLALCHEMY_DATABASE_URI'] = require_env("DATABASE_URL")
+database_url = require_env("DATABASE_URL")
+if database_url.startswith("postgres://"):  # Some hosts hand out the old spelling; SQLAlchemy needs postgresql://
+    database_url = "postgresql://" + database_url[len("postgres://"):]
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+# Hosted databases (e.g. Neon) pause when idle and drop open connections, so
+# check each pooled connection before use and replace old ones.
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 280}
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,     # JavaScript cannot read the login cookie
     SESSION_COOKIE_SAMESITE="Lax",    # Other sites cannot send it along with their requests
@@ -1098,8 +1106,12 @@ def update_entry(customer_name):
 # Scheduled reminders are stored in the entry_reminders table and removed once
 # the email has been sent successfully (or when the user clears them).
 # ---------------------------------------------------------------------------
-sender_email = require_env("MAIL_USERNAME")
-sender_password = require_env("MAIL_PASSWORD")  # Gmail app password
+# Emails go through Brevo's web API when BREVO_API_KEY is set (needed on hosts
+# that block email ports, such as Render's free plan), otherwise through Gmail.
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+MAIL_SENDER_NAME = os.environ.get("MAIL_SENDER_NAME", "").strip() or "Bill Up"
+sender_email = require_env("MAIL_USERNAME")  # With Brevo: a sender address verified in Brevo
+sender_password = "" if BREVO_API_KEY else require_env("MAIL_PASSWORD")  # Gmail app password
 
 REMINDER_RECIPIENTS = ("customer", "owner")
 
@@ -1203,8 +1215,33 @@ def build_email_message(to_address, subject, html, text):
     return msg
 
 
+def send_email_brevo(to_address, subject, html, text):
+    """Send through Brevo's HTTPS API. Raises on failure."""
+    payload = json.dumps({
+        "sender": {"name": MAIL_SENDER_NAME, "email": sender_email},
+        "to": [{"email": to_address}],
+        "subject": subject,
+        "htmlContent": html,
+        "textContent": text,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email", data=payload, method="POST",
+        headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            response.read()
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:300]
+        raise RuntimeError(f"Brevo rejected the email ({e.code}): {detail}") from None
+
+
 def send_email(to_address, subject, html, text):
     """Send an HTML email (with a plain-text fallback). Raises on failure."""
+    if BREVO_API_KEY:
+        send_email_brevo(to_address, subject, html, text)
+        return
+
     msg = build_email_message(to_address, subject, html, text)
 
     server = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
@@ -1306,31 +1343,71 @@ def entry_reminder(customer_name, entry_id):
     })
 
 
+_reminder_run_lock = threading.Lock()
+
+
 def send_due_reminders():
     """Send every scheduled reminder whose entry is due today (or overdue).
 
     Runs at 12:00 AM and then hourly, so a reminder that failed (for example
-    because there was no internet) is retried until it is sent.
+    because there was no internet) is retried until it is sent. Returns
+    (sent, failed), or None if another run was already in progress.
     """
-    with app.app_context():
-        today = date.today()
-        for reminder in EntryReminder.query.all():
-            try:
-                entry, _ = get_entry_record(reminder.user_id, reminder.customer_name, reminder.entry_id)
-                if not entry or not entry["Total"]:
-                    # Entry deleted or already paid: nothing to remind about
-                    db.session.delete(reminder)
-                    continue
-                if entry["due_date"] > today:
-                    continue
+    if not _reminder_run_lock.acquire(blocking=False):
+        return None  # Never run twice at once, or a reminder could be emailed twice
+    sent = failed = 0
+    try:
+        with app.app_context():
+            today = date.today()
+            for reminder in EntryReminder.query.all():
+                try:
+                    entry, _ = get_entry_record(reminder.user_id, reminder.customer_name, reminder.entry_id)
+                    if not entry or not entry["Total"]:
+                        # Entry deleted or already paid: nothing to remind about
+                        db.session.delete(reminder)
+                        continue
+                    if entry["due_date"] > today:
+                        continue
 
-                send_entry_reminder(reminder.user_id, reminder.customer_name, reminder.entry_id, reminder.recipient)
-                db.session.delete(reminder)
-            except Exception as e:
-                reminder.last_error = str(e)
-                reminder.last_attempt = datetime.now()
-                app.logger.error(f"Reminder {reminder.id} not sent: {e}")
-        db.session.commit()
+                    send_entry_reminder(reminder.user_id, reminder.customer_name, reminder.entry_id, reminder.recipient)
+                    db.session.delete(reminder)
+                    sent += 1
+                except Exception as e:
+                    reminder.last_error = str(e)
+                    reminder.last_attempt = datetime.now()
+                    failed += 1
+                    app.logger.error(f"Reminder {reminder.id} not sent: {e}")
+            db.session.commit()
+    finally:
+        _reminder_run_lock.release()
+    return sent, failed
+
+
+# On a host that sleeps when idle (Render's free plan) the built-in scheduler
+# cannot be relied on: set RUN_SCHEDULER=false and let an outside service
+# (cron-job.org) call /tasks/send-reminders every hour instead.
+RUN_SCHEDULER = env_flag("RUN_SCHEDULER", default=True)
+CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+
+
+@app.route("/tasks/send-reminders", methods=["GET", "POST"])
+@csrf.exempt
+def run_due_reminders():
+    """Hourly reminder run, triggered by cron-job.org. Needs the CRON_SECRET key."""
+    key = request.headers.get("X-Cron-Key") or request.args.get("key", "")
+    if not CRON_SECRET or not hmac.compare_digest(key.encode(), CRON_SECRET.encode()):
+        abort(404)  # Look like a missing page to anyone without the key
+    result = send_due_reminders()
+    if result is None:
+        return jsonify({"status": "already running"})
+    sent, failed = result
+    return jsonify({"status": "done", "sent": sent, "failed": failed})
+
+
+@app.route("/health")
+def health():
+    """Cheap page for uptime checks and the keep-awake ping (does not touch the database)."""
+    return "ok"
 
 
 scheduler = BackgroundScheduler()
@@ -1557,7 +1634,7 @@ if __name__ == "__main__":
         # runs this file twice (a watcher process and the real server); start the
         # scheduler only in the server process, otherwise every reminder email
         # would be sent twice.
-        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        if RUN_SCHEDULER and os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             scheduler.start()
             atexit.register(lambda: scheduler.shutdown())  # Graceful shutdown on exit
         app.run(debug=True)
@@ -1566,8 +1643,9 @@ if __name__ == "__main__":
         # several threads), so the reminder scheduler runs exactly once.
         from waitress import serve
 
-        scheduler.start()
-        atexit.register(lambda: scheduler.shutdown())
+        if RUN_SCHEDULER:
+            scheduler.start()
+            atexit.register(lambda: scheduler.shutdown())
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "5000"))
         app.logger.info(f"Bill Up running on http://{host}:{port}")
