@@ -102,6 +102,36 @@ def reflect_existing(metadata, *table_names):
     if existing:
         metadata.reflect(bind=db.engine, only=existing, extend_existing=True)
 
+TOTALS_BATCH_SIZE = 500  # Customers per totals query (PostgreSQL limits how many tables one query may lock)
+
+
+def add_customer_totals(user_id, customers):
+    """Set each customer's overall_total in a few database queries and return the sum of all of them."""
+    table_names = [f"{user_id}_{c['name'].lower()}" for c in customers]
+    if not table_names:
+        return 0
+    quote = db.engine.dialect.identifier_preparer.quote
+    total_sum = 0
+    with db.engine.connect() as connection:
+        existing = set(connection.execute(
+            db.text("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY(:names)"),
+            {"names": table_names},
+        ).scalars())
+        # One "SELECT SUM" per customer, joined with UNION ALL so the database answers a whole batch at once.
+        # Each row is tagged with the customer's position in the list (a number, never user text).
+        parts = [
+            f'SELECT {index} AS position, COALESCE(SUM("Total"), 0) AS total FROM {quote(name)}'
+            for index, name in enumerate(table_names) if name in existing
+        ]
+        for start in range(0, len(parts), TOTALS_BATCH_SIZE):
+            batch = " UNION ALL ".join(parts[start:start + TOTALS_BATCH_SIZE])
+            for position, total in connection.exec_driver_sql(batch):
+                customers[position]["overall_total"] = int(total)
+                total_sum += int(total)
+            connection.rollback()  # Release this batch's table locks before the next one
+    return total_sum
+
+
 NOTES_MAX_LENGTH = 200  # Maximum characters allowed in an entry's notes
 app.jinja_env.globals["NOTES_MAX_LENGTH"] = NOTES_MAX_LENGTH  # Same limit in the templates
 
@@ -447,21 +477,11 @@ def customer():
             column_names = result.keys()
             customers = [dict(zip(column_names, row)) for row in result]
 
-        # Calculate overall_total for each customer and the total sum
-        reflect_existing(metadata, *(f"{user_id}_{c['name'].lower()}" for c in customers))
+        # Calculate overall_total for each customer and the total sum.
+        # All totals come from a single query, so the page stays fast with many customers.
         for customer in customers:
-            customer_name = customer["name"]
-            entries_table_name = f"{user_id}_{customer_name.lower()}"
-
-            if entries_table_name in metadata.tables:
-                entries_table = metadata.tables[entries_table_name]
-                with db.engine.connect() as connection:
-                    total_query = db.func.sum(entries_table.c.Total)
-                    overall_total = connection.execute(db.select(total_query)).scalar()
-                    customer["overall_total"] = overall_total if overall_total else 0
-                    overall_total_sum += customer["overall_total"]  # Add to overall total
-            else:
-                customer["overall_total"] = 0  # Default to 0 if no entries table exists
+            customer["overall_total"] = 0  # Default to 0 if no entries table exists
+        overall_total_sum = add_customer_totals(user_id, customers)
 
     except Exception as e:
         app.logger.error(f"Error while loading customers: {e}")
