@@ -594,8 +594,22 @@ def validate_customer_contact_details(email, contact):
     return None
 
 
+def entries_table_clashes(user_id, customer_name):
+    """True if this customer's entries table name is a table the app uses for something else.
+
+    For example user "raj" + customer "customers" gives "raj_customers" (raj's customer list),
+    and user "entry" + customer "reminders" gives "entry_reminders" (every shop's reminders).
+    """
+    entries_table_name = f"{user_id}_{customer_name.lower()}".lower()
+    other_tables = {f"{user_id.lower()}_customers", Registration.__tablename__, EntryReminder.__tablename__}
+    return entries_table_name in {name.lower() for name in other_tables}
+
+
 def customer_exists(user_id, customer_name):
+    """True if the customer is in this shop's own customer list (and its entries table is safe to use)."""
     table_name = f"{user_id.lower()}_customers"
+    if entries_table_clashes(user_id, customer_name):
+        return False
     return db.inspect(db.engine).has_table(table_name) and get_customer_record(user_id, customer_name) is not None
 
 
@@ -608,6 +622,8 @@ def add_customer():
         customer_contact = request.form.get('customer_contact', '').strip()
 
         error = validate_customer_name(customer_name) or validate_customer_contact_details(customer_email, customer_contact)
+        if not error and entries_table_clashes(user_id, customer_name):
+            error = "This name cannot be used for a customer. Please choose a different name."
         if error:
             flash(error, "error")
             return redirect(url_for("customer"))
@@ -689,6 +705,9 @@ def account(customer_name):
 
         if not result:
             flash("Customer not found.", "error")
+            return redirect(url_for("customer"))
+        if entries_table_clashes(user_id, customer_name):
+            flash("This customer's name cannot be used. Please delete this customer and add them with a different name.", "error")
             return redirect(url_for("customer"))
 
         customer = dict(result._mapping)
@@ -889,6 +908,9 @@ def delete_entry(customer_name, entry_id):
 
     user_id = session["user_id"]
     table_name = f"{user_id}_{customer_name.lower()}"
+    if not customer_exists(user_id, customer_name):
+        flash("Customer not found.", "error")
+        return redirect(url_for("customer"))
 
     metadata = MetaData()
     engine = db.engine
@@ -954,9 +976,9 @@ def delete_customer(customer_id):
         dynamic_table_name = f"{user_id}_{customer_name.lower()}"
         reflect_existing(metadata, dynamic_table_name)
 
-        # Drop the dynamic table if it exists
+        # Drop the dynamic table if it exists (never when the name points at another table, such as the customer list)
         app.logger.debug(f"Checking for dynamic table: {dynamic_table_name}")
-        if dynamic_table_name in metadata.tables:
+        if dynamic_table_name in metadata.tables and not entries_table_clashes(user_id, customer_name):
             dynamic_table = metadata.tables[dynamic_table_name]
             with db.engine.connect() as connection:
                 app.logger.debug(f"Dropping dynamic table: {dynamic_table_name}")
@@ -968,6 +990,14 @@ def delete_customer(customer_id):
                 delete_query = customer_table.delete().where(customer_table.c.id == customer_id)
                 result = connection.execute(delete_query)
                 app.logger.debug(f"Delete query executed: {result.rowcount} rows affected")
+
+        # Remove the customer's scheduled reminders too, so a new customer with the same
+        # name does not inherit them (their entry numbers start again from 1)
+        EntryReminder.query.filter(
+            EntryReminder.user_id == user_id,
+            db.func.lower(EntryReminder.customer_name) == customer_name.lower(),
+        ).delete(synchronize_session=False)
+        db.session.commit()
 
         if result.rowcount > 0:
             app.logger.info(f"Successfully deleted customer ID {customer_id} from {customer_table_name}.")
@@ -1027,6 +1057,8 @@ def get_entry(customer_name, entry_id):
 
     user_id = session["user_id"]
     table_name = f"{user_id}_{customer_name.lower()}"
+    if not customer_exists(user_id, customer_name):
+        return jsonify({"error": "Customer not found"}), 404
 
     metadata = MetaData()
     engine = db.engine
@@ -1089,6 +1121,8 @@ def update_entry(customer_name):
     metadata = MetaData()
     engine = db.engine
     table_name = f"{user_id}_{customer_name.lower()}"
+    if not customer_exists(user_id, customer_name):
+        return jsonify({"error": "Customer not found"}), 404
 
     try:
         # Reflect the table to ensure it exists
@@ -1315,6 +1349,8 @@ def entry_reminder(customer_name, entry_id):
 
     user_id = session["user_id"]
     action = (request.get_json(silent=True) or {}).get("action")
+    if not customer_exists(user_id, customer_name):
+        return jsonify({"error": "Customer not found."}), 404
 
     if action == "email_now":
         try:
