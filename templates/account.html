@@ -655,10 +655,7 @@
         }
 
         // ---------- Reminders ----------
-        // The bell's state comes from the server (data-reminder on the cell):
-        //   ''         -> no reminder, normal bell
-        //   'customer' -> customer is emailed at 12:00 AM on the due date
-        //   'owner'    -> you are emailed at 12:00 AM on the due date
+        // data-reminder on the cell: '' (none), 'customer' or 'owner' (who is emailed on the due date)
         const REMINDER_LABELS = {
             customer: 'Reminder: customer, on due date',
             owner: 'Reminder: you, on due date',

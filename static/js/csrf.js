@@ -1,6 +1,5 @@
-// Adds the CSRF token (from <meta name="csrf-token">) to every fetch() that
-// changes data on this site, so the server can tell the request came from
-// one of our own pages. Load it in <head>, before any script that calls fetch.
+// Adds the CSRF token from <meta name="csrf-token"> to every data-changing fetch() on this site.
+// Load it in <head>, before any script that calls fetch.
 (function () {
     const meta = document.querySelector('meta[name="csrf-token"]');
     if (!meta || !window.fetch) return;

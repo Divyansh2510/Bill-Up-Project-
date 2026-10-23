@@ -58,7 +58,7 @@
 | **Scheduling** | APScheduler (local) / external cron (production) | Due-date reminder runs |
 | **Email** | Gmail SMTP (local) / [Brevo](https://www.brevo.com/) API (production) | Payment reminder emails |
 | **Production server** | [Waitress](https://docs.pylonsproject.org/projects/waitress/) | WSGI server for the live site |
-| **Frontend** | HTML5, CSS3, JavaScript, Bootstrap 4, Font Awesome, Chart.js | UI, icons and dashboard charts |
+| **Frontend** | HTML5, CSS3, JavaScript, Bootstrap 5, Font Awesome, Chart.js | UI, icons and dashboard charts |
 | **Configuration** | python-dotenv | Loads secrets from a `.env` file |
 
 ### Hosting (all free tier)
@@ -108,7 +108,6 @@ Bill-Up-Project-/
 ├── .env.example            # Template for the required settings — copy to .env
 ├── templates/
 │   ├── index.html          # Landing page
-│   ├── About.html
 │   ├── login.html / register.html
 │   ├── customer.html       # Customer list, search and totals
 │   ├── account.html        # One customer's entries and reminders
@@ -117,7 +116,7 @@ Bill-Up-Project-/
 │   └── partials/           # Shared navbar and footer
 └── static/
     ├── css/                # Page styles
-    ├── js/                 # csrf.js, confirm-dialog.js, scripts.js, vendor libraries
+    ├── js/                 # csrf.js (CSRF header for fetch), confirm-dialog.js
     └── img/
 ```
 

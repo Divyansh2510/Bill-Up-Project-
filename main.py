@@ -1,46 +1,34 @@
-from flask import Flask, render_template, request,session,redirect,url_for,jsonify,abort
-from sqlalchemy import Table, Column, Integer, String, MetaData,Float, Date, Text, JSON
-from sqlalchemy.exc import ProgrammingError, IntegrityError
-from sqlalchemy.dialects.postgresql import JSON
-from sqlalchemy import create_engine
-from flask_sqlalchemy import SQLAlchemy
-from flask import flash
-from datetime import datetime
-import logging
-from flask_mail import Mail
-from werkzeug.utils import secure_filename
-from werkzeug.exceptions import HTTPException
-from werkzeug.security import generate_password_hash,check_password_hash
-import json
-from functools import wraps
-import re
-import os
-import math
-from sqlalchemy import select
-from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect, CSRFError
-from wtforms import StringField, TextAreaField, DateField, IntegerField
-from wtforms.validators import DataRequired
-from sqlalchemy import or_
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
-from email.charset import Charset, BASE64
-from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime, date
 import atexit
-from google.cloud import translate_v2 as translate
-from dotenv import load_dotenv
-from werkzeug.middleware.proxy_fix import ProxyFix
 import hmac
+import json
+import logging
+import math
+import os
+import re
+import smtplib
 import threading
 import time
-import urllib.request
 import urllib.error
+import urllib.request
+from datetime import datetime, date
+from email.charset import Charset, BASE64
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from functools import wraps
 
-# Passwords and keys live in a .env file next to this script (never committed).
-# See .env.example for the list of settings.
+from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify, abort, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from sqlalchemy import Table, Column, Integer, String, MetaData, Date, Text, select
+from sqlalchemy.exc import IntegrityError
+from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Passwords and keys are read from a .env file next to this script (never committed, see .env.example)
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 
@@ -66,15 +54,13 @@ app = Flask(__name__)
 app.secret_key = require_env("SECRET_KEY")  # Signs the session cookie
 logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO)
 database_url = require_env("DATABASE_URL")
-# Use the psycopg2 driver from requirements.txt (SQLAlchemy 2.1 would otherwise
-# look for psycopg 3). Also accepts the old postgres:// spelling some hosts use.
+# Use the psycopg2 driver (SQLAlchemy 2.1 would otherwise look for psycopg 3); also accepts "postgres://"
 for prefix in ("postgres://", "postgresql://"):
     if database_url.startswith(prefix):
         database_url = "postgresql+psycopg2://" + database_url[len(prefix):]
         break
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-# Hosted databases (e.g. Neon) pause when idle and drop open connections, so
-# check each pooled connection before use and replace old ones.
+# Hosted databases (e.g. Neon) pause when idle and drop connections, so test each one before use
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 280}
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,     # JavaScript cannot read the login cookie
@@ -83,12 +69,11 @@ app.config.update(
     WTF_CSRF_TIME_LIMIT=None,         # A CSRF token stays valid for the whole login session
 )
 
-# Every POST must carry the CSRF token: forms send it as a hidden field and
-# fetch() calls send it as the X-CSRFToken header (see static/js/csrf.js).
+# Every POST must carry the CSRF token: forms send a hidden field, fetch() calls
+# send the X-CSRFToken header (see static/js/csrf.js)
 csrf = CSRFProtect(app)
 
-# Behind a hosting proxy (Render, Railway, Nginx...) this makes request.remote_addr
-# the visitor's real IP, which the login limit below relies on.
+# Behind a hosting proxy (Render, Nginx...) this gives the visitor's real IP, used by the login limit
 if env_flag("TRUST_PROXY"):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -117,8 +102,8 @@ def add_customer_totals(user_id, customers):
             db.text("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY(:names)"),
             {"names": table_names},
         ).scalars())
-        # One "SELECT SUM" per customer, joined with UNION ALL so the database answers a whole batch at once.
-        # Each row is tagged with the customer's position in the list (a number, never user text).
+        # One SUM per customer joined with UNION ALL, so a whole batch is answered at once;
+        # rows are tagged with the customer's position in the list (a number, never user text)
         parts = [
             f'SELECT {index} AS position, COALESCE(SUM("Total"), 0) AS total FROM {quote(name)}'
             for index, name in enumerate(table_names) if name in existing
@@ -137,6 +122,7 @@ app.jinja_env.globals["NOTES_MAX_LENGTH"] = NOTES_MAX_LENGTH  # Same limit in th
 
 
 class Registration(db.Model):
+    """A business account. The table name's spelling is kept because live data already uses it."""
     __tablename__ = 'Registeration'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     JoinDate = db.Column(db.DateTime, default=datetime.utcnow)
@@ -162,6 +148,7 @@ class EntryReminder(db.Model):
     last_attempt = db.Column(db.DateTime, nullable=True)
     last_error = db.Column(db.Text, nullable=True)
 
+
 @app.errorhandler(CSRFError)
 def handle_csrf_error(error):
     """A form or request arrived without a valid CSRF token (e.g. the page was open too long)."""
@@ -172,13 +159,8 @@ def handle_csrf_error(error):
     return redirect(request.referrer or url_for("index"))
 
 
-# ---------------------------------------------------------------------------
-# Login limit
-#
-# After LOGIN_MAX_FAILURES wrong passwords for the same user ID from the same IP
-# address, that pair is locked for LOGIN_LOCK_SECONDS. Kept in memory, so it
-# resets when the server restarts (the app runs as a single process).
-# ---------------------------------------------------------------------------
+# --- Login limit: 5 wrong passwords for one user ID from one IP locks that pair for 15 minutes ---
+# Kept in memory (the app runs as one process), so it resets when the server restarts.
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_SECONDS = 15 * 60
 _login_failures = {}  # (scope, ip, user id) -> {"count", "first", "locked_until"}
@@ -198,6 +180,7 @@ def login_locked_minutes(scope, user_id):
 
 
 def record_login_failure(scope, user_id):
+    """Count a wrong password and start the lock once the limit is reached."""
     now = time.time()
     with _login_failures_lock:
         if len(_login_failures) > 10000:  # Forget stale entries so the dict cannot grow forever
@@ -225,17 +208,15 @@ def too_many_attempts_message(minutes):
 
 @app.route("/")
 def index():
-
     return render_template("index.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        # Handling login form submission
-        user_id = request.form.get("UserID", "").strip()  # Get UserId from form input
-        password = request.form.get("Password", "").strip()  # Get Password from form input
+        user_id = request.form.get("UserID", "").strip()
+        password = request.form.get("Password", "").strip()
 
-        # Check for empty fields
         if not user_id or not password:
             return render_template(
                 "login.html",
@@ -260,27 +241,23 @@ def login():
                 user_id=user_id
             ), 429
 
-        # Query user from the database
         user = Registration.query.filter_by(UserID=user_id).first()
-
-        # Validate user credentials
         if user and check_password_hash(user.Password, password):
             clear_login_failures("user", user_id)
             session.clear()  # Start a fresh session on login
-            session["user_id"] = user.UserID  # Save user info in the session
+            session["user_id"] = user.UserID
             session["b_name"] = user.bName
             return redirect(url_for("customer"))
 
-        # Invalid credentials
         record_login_failure("user", user_id)
         return render_template(
             "login.html",
             error_message="Wrong password or username entered. Please try again.",
-            user_id=user_id  # Preserve the entered UserID
+            user_id=user_id  # Keep the entered User ID in the form
         )
 
-    # Render login page for GET requests
     return render_template("login.html")
+
 
 @app.route('/logout')
 def logout():
@@ -288,17 +265,8 @@ def logout():
     return redirect(url_for('index'))
 
 
-# ---------------------------------------------------------------------------
-# Registration validation
-#
-# Fields are listed in the order they appear on the form (the first problem
-# found is the one shown to the user).
-#
-# These rules are the single source of truth: the server checks them below,
-# and register.html receives them (as JSON) to run the same checks in the
-# browser and to set each field's maxlength. Patterns use syntax that works
-# in both Python and JavaScript.
-# ---------------------------------------------------------------------------
+# --- Registration validation: fields in form order; the first problem found is shown ---
+# register.html runs the same rules in the browser, so patterns must work in Python and JavaScript.
 REGISTRATION_RULES = {
     "bName": {
         "label": "Business name", "required": True, "min": 2, "max": 50, "needs_letter": True,
@@ -388,8 +356,7 @@ def validate_registration(data):
     if "Password" not in errors and data["Password"] != data["ConfirmPassword"]:
         errors["ConfirmPassword"] = "Passwords do not match."
 
-    # Uniqueness. User IDs are compared ignoring case because each user's
-    # customer table is named after the lower-case User ID.
+    # User IDs are unique ignoring case, because table names use the lower-case User ID
     if "UserID" not in errors and Registration.query.filter(
         db.func.lower(Registration.UserID) == data["UserID"].lower()
     ).first():
@@ -441,15 +408,13 @@ def customer():
 
     user_id = session["user_id"]
     b_name = session.get("b_name", "Default Business Name")
-    table_name = f"{user_id.lower()}_customers"  # Convert user_id to lowercase
+    table_name = f"{user_id.lower()}_customers"
     metadata = MetaData()
-    overall_total_sum = 0  # Initialize total sum
-    search_query = request.args.get("search", "").strip().lower()  # Get the search query and make it case-insensitive
+    overall_total_sum = 0
+    search_query = request.args.get("search", "").strip().lower()
 
     try:
-        # Reflect the specific table
         reflect_existing(metadata, table_name)
-
         if table_name not in metadata.tables:  # New business with no customers yet
             return render_template(
                 "customer.html",
@@ -460,34 +425,25 @@ def customer():
             )
 
         customer_table = metadata.tables[table_name]
-
-        # Open a connection to execute the query
         with db.engine.connect() as connection:
             query = customer_table.select()
-
             if search_query:
-                # Add a filter to the query for the search functionality (% and _ are matched literally)
+                # Case-insensitive search; % and _ are matched literally
                 query = query.where(
                     db.func.lower(customer_table.c.name).contains(search_query, autoescape=True)
                 )
-
             result = connection.execute(query)
-
-            # Fetch column names and rows
             column_names = result.keys()
             customers = [dict(zip(column_names, row)) for row in result]
 
-        # Calculate overall_total for each customer and the total sum.
-        # All totals come from a single query, so the page stays fast with many customers.
         for customer in customers:
-            customer["overall_total"] = 0  # Default to 0 if no entries table exists
+            customer["overall_total"] = 0  # Stays 0 for customers without an entries table
         overall_total_sum = add_customer_totals(user_id, customers)
 
     except Exception as e:
         app.logger.error(f"Error while loading customers: {e}")
-        customers = []  # Default to empty if an error occurs
+        customers = []
 
-    # Pass the filtered results to the template
     return render_template(
         "customer.html",
         user_id=user_id,
@@ -496,67 +452,9 @@ def customer():
         b_name=b_name,
     )
 
-# @app.route("/customer")
-# def customer():
-#     if "user_id" not in session:
-#         return redirect(url_for("login"))
 
-#     user_id = session["user_id"]
-#     b_name = session.get("b_name", "Default Business Name")
-#     table_name = f"{user_id.lower()}_customers"  # Convert user_id to lowercase
-#     metadata = MetaData()
-#     overall_total_sum = 0  # Initialize total sum
-
-#     try:
-#         # Reflect the specific table
-#         metadata.reflect(bind=db.engine, only=[table_name])
-
-#         if table_name not in metadata.tables:
-#             print(f"Table {table_name} does not exist.")
-#             return render_template("customer.html", user_id=user_id, customers=[], overall_total_sum=0)
-
-#         customer_table = metadata.tables[table_name]
-
-#         # Open a connection to execute the query
-#         with db.engine.connect() as connection:
-#             query = customer_table.select()
-#             result = connection.execute(query)
-
-#             # Fetch column names and rows
-#             column_names = result.keys()
-#             customers = [dict(zip(column_names, row)) for row in result]
-
-#         # Calculate overall_total for each customer and the total sum
-#         for customer in customers:
-#             customer_name = customer["name"]
-#             entries_table_name = f"{user_id}_{customer_name.lower()}"
-#             metadata.reflect(bind=db.engine)
-
-#             if entries_table_name in metadata.tables:
-#                 entries_table = metadata.tables[entries_table_name]
-#                 with db.engine.connect() as connection:
-#                     total_query = db.func.sum(entries_table.c.Total)
-#                     overall_total = connection.execute(db.select(total_query)).scalar()
-#                     customer["overall_total"] = overall_total if overall_total else 0
-#                     overall_total_sum += customer["overall_total"]  # Add to overall total
-#             else:
-#                 customer["overall_total"] = 0  # Default to 0 if no entries table exists
-
-#     except Exception as e:
-#         print(f"Error occurred: {e}")
-#         customers = []  # Default to empty if an error occurs
-
-#     return render_template("customer.html", user_id=user_id, customers=customers, overall_total_sum=overall_total_sum, b_name=b_name)
-
-
-# ---------------------------------------------------------------------------
-# Customer details
-#
-# Each customer's entries live in a table named "<user id>_<customer name>".
-# PostgreSQL cuts table names at 63 characters, so names are kept short enough
-# that two customers can never end up sharing a table, and limited to plain
-# characters that are safe in table names and URLs.
-# ---------------------------------------------------------------------------
+# --- Customers: each customer's entries live in a table named "<user id>_<customer name>" ---
+# Names are short (PostgreSQL cuts table names at 63 characters) and use only URL-safe characters.
 CUSTOMER_NAME_MAX = 40
 CUSTOMER_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 .&'\-]*$"
 CUSTOMER_EMAIL_MAX = 100
@@ -594,12 +492,24 @@ def validate_customer_contact_details(email, contact):
     return None
 
 
-def entries_table_clashes(user_id, customer_name):
-    """True if this customer's entries table name is a table the app uses for something else.
+def define_entries_table(metadata, table_name):
+    """The columns of a customer's entries table."""
+    return Table(
+        table_name,
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("purchase_date", Date, nullable=False),
+        Column("notes", Text, nullable=False),
+        Column("items_details", Text, nullable=False),
+        Column("Total", Integer, nullable=False),
+        Column("due_date", Date, nullable=False),
+        extend_existing=True
+    )
 
-    For example user "raj" + customer "customers" gives "raj_customers" (raj's customer list),
-    and user "entry" + customer "reminders" gives "entry_reminders" (every shop's reminders).
-    """
+
+def entries_table_clashes(user_id, customer_name):
+    """True if the entries table name is one the app uses for something else.
+    E.g. "raj" + "customers" is raj's customer list; "entry" + "reminders" is every shop's reminders."""
     entries_table_name = f"{user_id}_{customer_name.lower()}".lower()
     other_tables = {f"{user_id.lower()}_customers", Registration.__tablename__, EntryReminder.__tablename__}
     return entries_table_name in {name.lower() for name in other_tables}
@@ -615,7 +525,7 @@ def customer_exists(user_id, customer_name):
 
 @app.route("/add_customer", methods=["POST"])
 def add_customer():
-    if 'user_id' in session:  # Ensure the user is logged in
+    if 'user_id' in session:
         user_id = session['user_id']
         customer_name = clean_customer_name(request.form.get('customer_name'))
         customer_email = request.form.get('customer_email', '').strip()
@@ -628,15 +538,11 @@ def add_customer():
             flash(error, "error")
             return redirect(url_for("customer"))
 
-        # Standardize table name
-        table_name = f"{user_id.lower()}_customers"  # Lowercase for consistency
-
-        # Dynamic table creation
+        table_name = f"{user_id.lower()}_customers"
         engine = db.engine
         metadata = MetaData()
 
         try:
-            # Define or reflect the customer table
             customer_table = Table(
                 table_name, metadata,
                 Column('id', Integer, primary_key=True, autoincrement=True),
@@ -645,9 +551,8 @@ def add_customer():
                 Column('contact', String(20), nullable=False),
                 extend_existing=True
             )
-            metadata.create_all(engine)  # Create the table if it doesn't exist
+            metadata.create_all(engine)  # Creates the customer list on the shop's first customer
 
-            # Insert data into the new table
             with engine.connect() as connection:
                 # "Ravi" and "ravi" would share one entries table, so names are unique ignoring case
                 duplicate = connection.execute(
@@ -660,23 +565,24 @@ def add_customer():
                     email=customer_email,
                     contact=customer_contact
                 )
-                connection.execute(insert_query)  # Execute the insert query
-                connection.commit()  # Commit transaction
+                connection.execute(insert_query)
+                connection.commit()
 
-            flash("Customer added successfully!", "success")  # Toast notification
+            flash("Customer added successfully!", "success")
             return redirect(url_for("customer"))
 
         except IntegrityError:
-            flash("This customer already exists. Please check once.", "error")  # Toast notification
+            flash("This customer already exists. Please check once.", "error")
             return redirect(url_for("customer"))
 
         except Exception as e:
             app.logger.error(f"Error while adding customer: {e}")
-            flash("Something went wrong while adding the customer. Please try again.", "error")  # Toast notification
+            flash("Something went wrong while adding the customer. Please try again.", "error")
             return redirect(url_for("customer"))
 
     flash("Unauthorized access. Please log in.", "error")
     return redirect(url_for("login"))
+
 
 @app.route("/account/<customer_name>")
 def account(customer_name):
@@ -690,15 +596,12 @@ def account(customer_name):
     metadata = MetaData()
 
     try:
-        # Reflect the customer table
         metadata.reflect(bind=db.engine, only=[customer_table_name])
         if customer_table_name not in metadata.tables:
             flash("Customer table does not exist.", "error")
             return redirect(url_for("customer"))
 
         customer_table = metadata.tables[customer_table_name]
-
-        # Query for the customer
         with db.engine.connect() as connection:
             query = customer_table.select().where(customer_table.c.name == customer_name)
             result = connection.execute(query).fetchone()
@@ -712,30 +615,16 @@ def account(customer_name):
 
         customer = dict(result._mapping)
 
-        # Check if the dynamic table exists
         reflect_existing(metadata, entries_table_name)
         if entries_table_name in metadata.tables:
             entries_table = metadata.tables[entries_table_name]
             with db.engine.connect() as connection:
-                entries = connection.execute(entries_table.select()).fetchall()
-                entries = [dict(row._mapping) for row in entries]
-                overall_total = sum(int(entry["Total"]) for entry in entries if entry["Total"] is not None)
-
-                # overall_total = sum(entry["Total"] for entry in entries)
+                entries = [dict(row._mapping) for row in connection.execute(entries_table.select())]
+            overall_total = sum(int(entry["Total"]) for entry in entries if entry["Total"] is not None)
         else:
-            # Create the dynamic table if it doesn't exist
-            entries_table = Table(
-                entries_table_name,
-                metadata,
-                Column("id", Integer, primary_key=True, autoincrement=True),
-                Column("purchase_date", Date, nullable=False),
-                Column("notes", Text, nullable=False),
-                Column("items_details", Text, nullable=False),
-                Column("Total", Integer, nullable=False),
-                Column("due_date", Date, nullable=False),
-                extend_existing=True
-            )
-            metadata.create_all(db.engine)  # Create the table
+            # First visit: create the customer's (empty) entries table
+            define_entries_table(metadata, entries_table_name)
+            metadata.create_all(db.engine)
             entries = []
             overall_total = 0
     except Exception as e:
@@ -766,17 +655,16 @@ def add_entry(customer_name):
         return redirect(url_for("login"))
 
     user_id = session["user_id"]
-    table_name = f"{user_id}_{customer_name.lower()}"  # Table name pattern: user_customer
+    table_name = f"{user_id}_{customer_name.lower()}"
 
-    # Only create entries for an existing customer (the name comes from the URL)
+    # The name comes from the URL, so only add entries for a customer of this shop
     if not customer_exists(user_id, customer_name):
         flash("Customer not found.", "error")
         return redirect(url_for("customer"))
 
-    # Collect form data
     purchase_date = request.form.get("pdate")
     notes = request.form.get("notes")
-    items_details = request.form.get("items_details")  # Expecting JSON from the form
+    items_details = request.form.get("items_details")
     due_date = request.form.get("duedate")
     Total = request.form.get("Total")
 
@@ -784,9 +672,8 @@ def add_entry(customer_name):
         flash(f"Notes cannot be longer than {NOTES_MAX_LENGTH} characters.", "error")
         return redirect(url_for("account", customer_name=customer_name))
 
-    # Convert Total to an integer and handle invalid input
     try:
-        Total = int(Total)  # Use float(Total) if decimals are required
+        Total = int(Total)  # Amounts are whole rupees
     except (ValueError, TypeError):
         flash("Invalid Total value. Please enter a numeric value.", "error")
         return redirect(url_for("account", customer_name=customer_name))
@@ -795,21 +682,9 @@ def add_entry(customer_name):
     engine = db.engine
 
     try:
-        # Define the customer-specific table
-        customer_table = Table(
-            table_name,
-            metadata,
-            Column("id", Integer, primary_key=True, autoincrement=True),
-            Column("purchase_date", Date, nullable=False),
-            Column("notes", Text, nullable=False),
-            Column("items_details", Text, nullable=False),
-            Column("Total", Integer, nullable=False),
-            Column("due_date", Date, nullable=False),
-            extend_existing=True
-        )
-        metadata.create_all(engine)  # Ensure table is created
+        customer_table = define_entries_table(metadata, table_name)
+        metadata.create_all(engine)  # Creates the table if it does not exist yet
 
-        # Insert the new entry
         with engine.connect() as connection:
             with connection.begin():
                 insert_query = customer_table.insert().values(
@@ -831,75 +706,6 @@ def add_entry(customer_name):
         return redirect(url_for("account", customer_name=customer_name))
 
 
-# @app.route("/add_entry/<customer_name>", methods=["POST"])
-# def add_entry(customer_name):
-#     if "user_id" not in session:
-#         flash("Unauthorized access. Please log in.", "error")
-#         return redirect(url_for("login"))
-
-#     user_id = session["user_id"]
-#     table_name = f"{user_id}_{customer_name.lower()}"  # Table name pattern: user_customer
-
-#     # Collect form data
-#     purchase_date = request.form.get("pdate")
-#     notes = request.form.get("notes")
-#     items_json = request.form.get("items")  # Expecting JSON from the form
-#     due_date = request.form.get("duedate")
-
-#     # Parse items JSON
-#     try:
-#         items = json.loads(items_json) if items_json else []
-#     except Exception as e:
-#         app.logger.error(f"Error parsing items JSON: {e}")
-#         flash(f"Error parsing items: {e}", "error")
-#         return redirect(url_for("account", customer_name=customer_name))
-
-#     # Calculate total from items
-#     total = sum(float(item["price"]) for item in items) if items else 0.0
-
-#     metadata = MetaData()
-#     engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
-
-#     try:
-#         # Define the customer-specific table
-#         customer_table = Table(
-#             table_name,
-#             metadata,
-#             Column("id", Integer, primary_key=True, autoincrement=True),
-#             Column("purchase_date", Date, nullable=False),
-#             Column("notes", Text, nullable=False),
-#             Column("items", JSON if engine.dialect.name != "sqlite" else Text, nullable=False),
-#             Column("due_date", Date, nullable=False),
-#             Column("total", Float, nullable=False),
-#             extend_existing=True
-#         )
-#         metadata.create_all(engine)  # Ensure table is created
-
-#         # Log the data being inserted
-#         app.logger.info(f"Preparing to insert into table {table_name}:")
-#         app.logger.info(f"purchase_date={purchase_date}, notes={notes}, items={items}, due_date={due_date}, total={total}")
-
-#         # Insert the new entry
-#         with engine.connect() as connection:
-#           with connection.begin():
-#             insert_query = customer_table.insert().values(
-#                 purchase_date=purchase_date,
-#                 notes=notes,
-#                 items=json.dumps(items),  # Store as JSON (or string for SQLite)
-#                 due_date=due_date,
-#                 total=total
-#             )
-#             result = connection.execute(insert_query)
-#             app.logger.info(f"Insert result: {result.rowcount} rows affected.")
-
-#         flash("Entry added successfully!", "success")
-#         return redirect(url_for("account", customer_name=customer_name))
-
-#     except Exception as e:
-#         app.logger.error(f"Error while adding entry: {e}")
-#         flash("An error occurred while adding the entry.", "error")
-#         return redirect(url_for("account", customer_name=customer_name))
-
 @app.route("/delete_entry/<customer_name>/<int:entry_id>", methods=["POST"])
 def delete_entry(customer_name, entry_id):
     if "user_id" not in session:
@@ -916,15 +722,12 @@ def delete_entry(customer_name, entry_id):
     engine = db.engine
 
     try:
-        # Reflect the dynamic table
-        metadata.reflect(bind=engine)
+        reflect_existing(metadata, table_name)  # Only this customer's table, not the whole database
         if table_name not in metadata.tables:
             flash("Table not found.", "error")
             return redirect(url_for("account", customer_name=customer_name))
 
         entries_table = metadata.tables[table_name]
-
-        # Delete the entry
         with engine.connect() as connection:
             with connection.begin():
                 delete_query = entries_table.delete().where(entries_table.c.id == entry_id)
@@ -940,6 +743,7 @@ def delete_entry(customer_name, entry_id):
 
     return redirect(url_for("account", customer_name=customer_name))
 
+
 @app.route("/delete_customer/<int:customer_id>", methods=["POST"])
 def delete_customer(customer_id):
     if "user_id" not in session:
@@ -951,18 +755,13 @@ def delete_customer(customer_id):
     metadata = MetaData()
 
     try:
-        # Reflect metadata to ensure table exists
         reflect_existing(metadata, customer_table_name)
-
-        # Check if the customer table exists
         if customer_table_name not in metadata.tables:
             app.logger.error(f"Customer table {customer_table_name} not found.")
             flash("Customer table not found.", "error")
             return redirect(url_for("customer"))
 
         customer_table = metadata.tables[customer_table_name]
-
-        # Fetch customer details as a dictionary
         with db.engine.connect() as connection:
             customer_query = select(customer_table).where(customer_table.c.id == customer_id)
             customer = connection.execute(customer_query).mappings().fetchone()
@@ -976,23 +775,19 @@ def delete_customer(customer_id):
         dynamic_table_name = f"{user_id}_{customer_name.lower()}"
         reflect_existing(metadata, dynamic_table_name)
 
-        # Drop the dynamic table if it exists (never when the name points at another table, such as the customer list)
-        app.logger.debug(f"Checking for dynamic table: {dynamic_table_name}")
+        # Drop the customer's entries table (never when the name points at another table, such as the customer list)
         if dynamic_table_name in metadata.tables and not entries_table_clashes(user_id, customer_name):
-            dynamic_table = metadata.tables[dynamic_table_name]
-            with db.engine.connect() as connection:
-                app.logger.debug(f"Dropping dynamic table: {dynamic_table_name}")
-                dynamic_table.drop(db.engine)
+            app.logger.debug(f"Dropping dynamic table: {dynamic_table_name}")
+            metadata.tables[dynamic_table_name].drop(db.engine)
 
-        # Delete the customer from the customers table
         with db.engine.connect() as connection:
             with connection.begin():
                 delete_query = customer_table.delete().where(customer_table.c.id == customer_id)
                 result = connection.execute(delete_query)
                 app.logger.debug(f"Delete query executed: {result.rowcount} rows affected")
 
-        # Remove the customer's scheduled reminders too, so a new customer with the same
-        # name does not inherit them (their entry numbers start again from 1)
+        # Remove their reminders too, so a new customer with the same name (whose entry numbers
+        # start again from 1) does not inherit them
         EntryReminder.query.filter(
             EntryReminder.user_id == user_id,
             db.func.lower(EntryReminder.customer_name) == customer_name.lower(),
@@ -1028,11 +823,9 @@ def update_customer(customer_name):
 
     metadata = MetaData()
     try:
-        # Reflect the customer table
         metadata.reflect(bind=db.engine, only=[table_name])
         customer_table = metadata.tables[table_name]
 
-        # Update the specific customer's details
         with db.engine.connect() as connection:
             update_query = customer_table.update().where(
                 customer_table.c.name == customer_name
@@ -1041,7 +834,7 @@ def update_customer(customer_name):
                 email=email
             )
             connection.execute(update_query)
-            connection.commit()  # Commit transaction
+            connection.commit()
 
         return jsonify({"success": "Customer details updated successfully"}), 200
 
@@ -1069,25 +862,21 @@ def get_entry(customer_name, entry_id):
         with engine.connect() as connection:
             query = customer_table.select().where(customer_table.c.id == entry_id)
             result = connection.execute(query).fetchone()
+        if not result:
+            return jsonify({"error": "Entry not found"}), 404
 
-        if result:
-          # Convert SQLAlchemy result to dictionary
-          result_dict = dict(result._mapping)
-
-    # Format date fields
-        if "purchase_date" in result_dict and result_dict["purchase_date"]:
-          result_dict["purchase_date"] = result_dict["purchase_date"].strftime("%Y-%m-%d")
-        if "due_date" in result_dict and result_dict["due_date"]:
-          result_dict["due_date"] = result_dict["due_date"].strftime("%Y-%m-%d")
-
-    # Rename Total to total
-        if "Total" in result_dict:
-         result_dict["total"] = result_dict.pop("Total")
+        # Dates as YYYY-MM-DD for the edit form's date inputs
+        result_dict = dict(result._mapping)
+        for field in ("purchase_date", "due_date"):
+            if result_dict.get(field):
+                result_dict[field] = result_dict[field].strftime("%Y-%m-%d")
+        result_dict["total"] = result_dict.pop("Total")
 
         return jsonify(result_dict)
     except Exception as e:
         app.logger.error(f"Error occurred: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
+
 
 @app.route("/update_entry/<customer_name>", methods=["POST"])
 def update_entry(customer_name):
@@ -1112,7 +901,6 @@ def update_entry(customer_name):
         return jsonify({"error": f"Notes cannot be longer than {NOTES_MAX_LENGTH} characters."}), 400
 
     try:
-        # Validate entry_id
         entry_id = int(entry_id)
     except (ValueError, TypeError):
         app.logger.error("Invalid entry_id provided.")
@@ -1125,7 +913,6 @@ def update_entry(customer_name):
         return jsonify({"error": "Customer not found"}), 404
 
     try:
-        # Reflect the table to ensure it exists
         customer_table = Table(table_name, metadata, autoload_with=engine)
 
         with engine.connect() as connection:
@@ -1136,7 +923,7 @@ def update_entry(customer_name):
                     purchase_date=purchase_date,
                     notes=notes,
                     items_details=items_details,
-                    Total=total,  # Match the column name in the database
+                    Total=total,
                     due_date=due_date,
                 )
             )
@@ -1153,25 +940,12 @@ def update_entry(customer_name):
         app.logger.error(f"Error occurred: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
-#sending mail
-# ---------------------------------------------------------------------------
-# Payment reminders
-#
-# The bell menu on the account page offers three options per entry:
-#   "Email now"        -> email the customer immediately
-#   "On the due date"  -> email the customer at 12:00 AM on the entry's due date
-#   "Remind me"        -> email the business owner at 12:00 AM on the due date
-# Scheduled reminders are stored in the entry_reminders table and removed once
-# the email has been sent successfully (or when the user clears them).
-# ---------------------------------------------------------------------------
-# Emails go through Brevo's web API when BREVO_API_KEY is set (needed on hosts
-# that block email ports, such as Render's free plan), otherwise through Gmail.
+# --- Payment reminders: "Email now", "On the due date" (customer) or "Remind me" (owner) ---
+# Scheduled ones wait in entry_reminders until sent; email goes through Brevo if BREVO_API_KEY is set, else Gmail.
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
 MAIL_SENDER_NAME = os.environ.get("MAIL_SENDER_NAME", "").strip() or "Bill Up"
 sender_email = require_env("MAIL_USERNAME")  # With Brevo: a sender address verified in Brevo
 sender_password = "" if BREVO_API_KEY else require_env("MAIL_PASSWORD")  # Gmail app password
-
-REMINDER_RECIPIENTS = ("customer", "owner")
 
 
 def get_customer_record(user_id, customer_name):
@@ -1259,13 +1033,13 @@ def build_reminder_email(recipient, b_name, customer_name, entry, outstanding):
 
 
 def build_email_message(to_address, subject, html, text):
+    """Build a Gmail SMTP message with HTML and plain-text parts."""
     msg = MIMEMultipart("alternative")
     msg["From"] = sender_email
     msg["To"] = to_address
     # Header() encodes non-ASCII characters such as "₹", which smtplib rejects in raw headers
     msg["Subject"] = Header(subject, "utf-8")
-    # flask_mail switches the global utf-8 charset to raw 8-bit bodies, which
-    # smtplib cannot send; base64 keeps the whole message ASCII-safe
+    # Base64 bodies keep the whole message ASCII-safe for smtplib
     body_charset = Charset("utf-8")
     body_charset.body_encoding = BASE64
     msg.attach(MIMEText(text, "plain", body_charset))
@@ -1407,12 +1181,8 @@ _reminder_run_lock = threading.Lock()
 
 
 def send_due_reminders():
-    """Send every scheduled reminder whose entry is due today (or overdue).
-
-    Runs at 12:00 AM and then hourly, so a reminder that failed (for example
-    because there was no internet) is retried until it is sent. Returns
-    (sent, failed), or None if another run was already in progress.
-    """
+    """Send every scheduled reminder that is due; runs hourly, so failed ones are retried.
+    Returns (sent, failed), or None if another run is already in progress."""
     if not _reminder_run_lock.acquire(blocking=False):
         return None  # Never run twice at once, or a reminder could be emailed twice
     sent = failed = 0
@@ -1443,9 +1213,8 @@ def send_due_reminders():
     return sent, failed
 
 
-# On a host that sleeps when idle (Render's free plan) the built-in scheduler
-# cannot be relied on: set RUN_SCHEDULER=false and let an outside service
-# (cron-job.org) call /tasks/send-reminders every hour instead.
+# Hosts that sleep when idle (Render free) set RUN_SCHEDULER=false; cron-job.org then
+# calls /tasks/send-reminders every hour instead
 RUN_SCHEDULER = env_flag("RUN_SCHEDULER", default=True)
 CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
 
@@ -1475,9 +1244,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(func=send_due_reminders, trigger="cron", minute=0,
                   id="due_reminders", coalesce=True, misfire_grace_time=3600)
 
-# ---------------------------------------------------------------------------
-# Admin
-# ---------------------------------------------------------------------------
+# --- Admin ---
 ADMIN_USERNAME = require_env("ADMIN_USERNAME")
 ADMIN_PASSWORD = require_env("ADMIN_PASSWORD")
 ADMIN_FIELD_MAX = 128  # Longest admin ID / password the login form accepts
@@ -1536,11 +1303,8 @@ def AdminLogout():
 
 
 def business_tables(user_id, existing_tables):
-    """Return (customers table name, [entries table names]) that belong to one business.
-
-    Names are built exactly the way the rest of the app builds them, so no other
-    business's tables can be matched by accident.
-    """
+    """Return (customers table name, [entries table names]) of one business.
+    Names are built exactly as elsewhere in the app, so no other business's tables can match."""
     customers_table = f"{user_id.lower()}_customers"
     entry_tables = []
     if customers_table in existing_tables:
@@ -1573,7 +1337,6 @@ def business_stats(user_id, existing_tables):
     return stats
 
 
-#Admin Dashboard Route
 @app.route('/AdminDash')
 @admin_required
 def AdminDash():
@@ -1673,10 +1436,6 @@ def delete_registration(user_id):
     return jsonify({"message": f"{reg.bName} and all of its data were deleted."})
 
 
-@app.route("/About.html")
-def About():
-    return render_template("About.html")
-
 @app.errorhandler(Exception)
 def handle_exception(e):
     if isinstance(e, HTTPException):  # 404, 405... keep their own status
@@ -1690,17 +1449,14 @@ if __name__ == "__main__":
         db.create_all()
 
     if DEBUG:
-        # Development: Flask's auto-reloading server. With debug on, the reloader
-        # runs this file twice (a watcher process and the real server); start the
-        # scheduler only in the server process, otherwise every reminder email
-        # would be sent twice.
+        # Development server. Its reloader runs this file twice, so start the scheduler
+        # only in the real server process, or every reminder would be emailed twice.
         if RUN_SCHEDULER and os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             scheduler.start()
-            atexit.register(lambda: scheduler.shutdown())  # Graceful shutdown on exit
+            atexit.register(lambda: scheduler.shutdown())
         app.run(debug=True)
     else:
-        # Live: Waitress, a production server. It runs a single process (with
-        # several threads), so the reminder scheduler runs exactly once.
+        # Live: Waitress runs one process (with threads), so the scheduler runs exactly once
         from waitress import serve
 
         if RUN_SCHEDULER:

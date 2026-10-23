@@ -1,7 +1,5 @@
-/* Navbar and footer for the public pages (home, login, register).
-   Matches the look of the logged-in navbar in customer.css. Everything is
-   scoped to .pub-* classes so the page's own CSS (MDB / landing theme) does
-   not change it. */
+/* Navbar and footer for the public pages (home, login, register), matching customer.css.
+   Scoped to .pub-* classes so each page's own CSS (MDB / landing theme) cannot change it. */
 
 .pub-nav,
 .pub-footer {

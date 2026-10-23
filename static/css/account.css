@@ -1,6 +1,4 @@
-/* Account (single customer) page.
-   Shared look (navbar, cards, table, modal) comes from customer.css;
-   this file only adds what is specific to this page. */
+/* Account (single customer) page: only what differs from the shared look in customer.css. */
 
 /* ---------- Back link ---------- */
 .back-link {
