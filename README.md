@@ -26,6 +26,7 @@
 
 ### For business owners
 - **Business accounts** — register a business and log in with a personal User ID and password.
+- **Forgot password** — reset it with a 6-digit code emailed to the registered address.
 - **Customer management** — add, edit, search and delete customers, with their email and contact number.
 - **Credit entries** — record each purchase with date, due date, amount, item details and notes; edit or delete entries later.
 - **Outstanding totals** — see the amount each customer owes and the total outstanding across all customers.
@@ -95,6 +96,7 @@
 - `<userid>_customers` — the customers of each business.
 - `<userid>_<customer>` — the credit entries of each customer.
 - `entry_reminders` — scheduled reminders waiting to be sent.
+- `password_resets` — forgot-password codes (hashed), wrong attempts and lockouts.
 
 ---
 
@@ -212,6 +214,7 @@ Every push to `main` redeploys the site automatically.
 - Passwords are stored as salted hashes, never in plain text.
 - All forms and in-page requests are protected against CSRF.
 - Repeated failed logins are temporarily locked (5 attempts per 15 minutes).
+- Password reset codes are hashed, single-use and valid for 10 minutes; 2 wrong codes lock that email for 5 minutes on the server. Passwords are never sent by email.
 - Session cookies are `HttpOnly`, `SameSite=Lax` and HTTPS-only in production.
 - All user input is validated on the server; database queries are parameterised.
 - Secrets live only in environment variables — nothing sensitive is committed to the repository.

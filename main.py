@@ -5,12 +5,13 @@ import logging
 import math
 import os
 import re
+import secrets
 import smtplib
 import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from email.charset import Charset, BASE64
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
@@ -147,6 +148,18 @@ class EntryReminder(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     last_attempt = db.Column(db.DateTime, nullable=True)
     last_error = db.Column(db.Text, nullable=True)
+
+
+class PasswordReset(db.Model):
+    """Forgot-password state for one email: the emailed code, wrong attempts and lockout."""
+    __tablename__ = 'password_resets'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    code_hash = db.Column(db.String(255), nullable=True)  # Stored hashed, like passwords
+    code_expires = db.Column(db.DateTime, nullable=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    verified_until = db.Column(db.DateTime, nullable=True)  # Set once the right code is entered
 
 
 @app.errorhandler(CSRFError)
@@ -1243,6 +1256,148 @@ scheduler = BackgroundScheduler()
 # Every hour on the hour, starting at 12:00 AM; the first run on the due date is midnight
 scheduler.add_job(func=send_due_reminders, trigger="cron", minute=0,
                   id="due_reminders", coalesce=True, misfire_grace_time=3600)
+
+# --- Forgot password: emailed 6-digit code (10 minutes), 2 wrong tries lock that email for 5 minutes ---
+RESET_CODE_MINUTES = 10
+RESET_MAX_ATTEMPTS = 2
+RESET_LOCK_MINUTES = 5
+
+
+def reset_locked_response(row):
+    """A 429 JSON response if this email is locked, else None."""
+    if row and row.locked_until and row.locked_until > datetime.now():
+        seconds = int((row.locked_until - datetime.now()).total_seconds()) + 1
+        minutes = math.ceil(seconds / 60)
+        return jsonify({
+            "error": f"Max attempts reached. Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
+            "retry_after": seconds,
+        }), 429
+    return None
+
+
+def send_password_email(to_address, kind, **context):
+    """Send the reset code ("code") or the password-changed notice ("changed")."""
+    if kind == "code":
+        subject = "Your Bill Up password reset code"
+        text = (f"Your Bill Up password reset code is {context['code']}.\n"
+                f"It is valid for {RESET_CODE_MINUTES} minutes. If you did not ask for it, ignore this email.")
+    else:
+        subject = "Your Bill Up password was changed"
+        text = (f"The password for your Bill Up account ({', '.join(context['user_ids'])}) was just changed.\n"
+                "If you did not do this, reset your password again and contact us.")
+    html = render_template("emails/password_reset.html", kind=kind, minutes=RESET_CODE_MINUTES, **context)
+    send_email(to_address, subject, html, text)
+
+
+def reset_accounts(email):
+    """Every business account registered with this email (normally one)."""
+    return Registration.query.filter(db.func.lower(Registration.Email) == email).all()
+
+
+@app.route("/forgot-password/request", methods=["POST"])
+def forgot_password_request():
+    """Step 1: check the email belongs to an account and email it a code."""
+    email = str((request.get_json(silent=True) or {}).get("email") or "").strip().lower()
+    if not re.fullmatch(REGISTRATION_RULES["Email"]["pattern"], email) or len(email) > 100:
+        return jsonify({"error": "Please enter a valid email address."}), 400
+
+    row = PasswordReset.query.filter_by(email=email).first()
+    locked = reset_locked_response(row)
+    if locked:
+        return locked
+    if not reset_accounts(email):
+        return jsonify({"error": "No account can be found with this email. Please check again."}), 404
+
+    code = f"{secrets.randbelow(10 ** 6):06d}"
+    if not row:
+        row = PasswordReset(email=email)
+        db.session.add(row)
+    row.code_hash = generate_password_hash(code)  # A new code replaces any earlier one
+    row.code_expires = datetime.now() + timedelta(minutes=RESET_CODE_MINUTES)
+    row.attempts = 0
+    row.locked_until = row.verified_until = None
+    db.session.commit()
+
+    try:
+        send_password_email(email, "code", code=code)
+    except Exception as e:
+        app.logger.error(f"Failed to send reset code to {email}: {e}")
+        row.code_hash = None
+        db.session.commit()
+        return jsonify({"error": "The email could not be sent. Please try again."}), 500
+
+    session["reset_email"] = email  # Later steps only work for this email, in this browser
+    return jsonify({"message": f"A 6-digit code has been sent to {email}. It is valid for {RESET_CODE_MINUTES} minutes."})
+
+
+@app.route("/forgot-password/verify", methods=["POST"])
+def forgot_password_verify():
+    """Step 2: check the code; the second wrong try locks the email."""
+    email = session.get("reset_email")
+    row = PasswordReset.query.filter_by(email=email).first() if email else None
+    locked = reset_locked_response(row)
+    if locked:
+        return locked
+    if not row or not row.code_hash:
+        return jsonify({"error": "Please request a new code.", "restart": True}), 400
+    if row.code_expires < datetime.now():
+        row.code_hash = None
+        db.session.commit()
+        return jsonify({"error": "This code has expired. Please request a new one.", "restart": True}), 400
+
+    code = str((request.get_json(silent=True) or {}).get("code") or "").strip()
+    if not (re.fullmatch(r"[0-9]{6}", code) and check_password_hash(row.code_hash, code)):
+        row.attempts += 1
+        if row.attempts >= RESET_MAX_ATTEMPTS:
+            row.code_hash = None  # The code is used up; a new one can be requested after the lock
+            row.locked_until = datetime.now() + timedelta(minutes=RESET_LOCK_MINUTES)
+            db.session.commit()
+            return reset_locked_response(row)
+        db.session.commit()
+        left = RESET_MAX_ATTEMPTS - row.attempts
+        return jsonify({"error": f"Incorrect code. {left} attempt{'s' if left != 1 else ''} left."}), 400
+
+    row.code_hash = None  # Each code works only once
+    row.attempts = 0
+    row.verified_until = datetime.now() + timedelta(minutes=RESET_CODE_MINUTES)
+    db.session.commit()
+    return jsonify({"message": "Code verified. Please choose a new password."})
+
+
+@app.route("/forgot-password/reset", methods=["POST"])
+def forgot_password_reset():
+    """Step 3: save the new password (only after the right code) and email a notice without it."""
+    email = session.get("reset_email")
+    row = PasswordReset.query.filter_by(email=email).first() if email else None
+    if not row or not row.verified_until or row.verified_until < datetime.now():
+        return jsonify({"error": "Your verification has expired. Please start again.", "restart": True}), 400
+
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password") or "")
+    error = check_field("Password", password)
+    if not error and password != str(data.get("confirm") or ""):
+        error = "Passwords do not match."
+    if error:
+        return jsonify({"error": error}), 400
+
+    accounts = reset_accounts(email)
+    for account in accounts:
+        account.Password = generate_password_hash(password)
+        clear_login_failures("user", account.UserID)
+    db.session.delete(row)
+    db.session.commit()
+    session.pop("reset_email", None)
+
+    user_ids = [account.UserID for account in accounts]
+    try:
+        send_password_email(email, "changed", user_ids=user_ids)
+    except Exception as e:
+        app.logger.error(f"Failed to send password-changed notice to {email}: {e}")  # The password is already saved
+    return jsonify({
+        "message": "Your password has been updated. You can now log in.",
+        "user_id": user_ids[0] if len(user_ids) == 1 else "",
+    })
+
 
 # --- Admin ---
 ADMIN_USERNAME = require_env("ADMIN_USERNAME")
